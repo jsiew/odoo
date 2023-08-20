@@ -1,0 +1,54 @@
+<?xml version='1.0' encoding='utf-8'?>
+<odoo>
+    <record model="generic.tag.model" id="tag_model_stock_location">
+	    <field name="res_model_id" ref="stock.model_stock_location"/>
+    </record>
+
+    <record id="stock_location_view_form_tags" model="ir.ui.view">
+        <field name="name">stock.location.form.tags</field>
+        <field name="model">stock.location</field>
+        <field name="inherit_id" ref="stock.view_location_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="/form/sheet/group/group" position="inside">
+                <field name="rack_tag_id" string="Rack" readonly="1"/>
+                <field name="slot_tag_id" string="Slot" readonly="1"/>
+                <field name="ref_number" string="Bkg/BL No." readonly="1"/>
+                <field name="container_number" readonly="1"/>
+                <field name="pallet_name" readonly="1"/>
+                <field name="generic_tag_ids"
+                    widget="many2many_tags"
+                    placeholder="Tags..."
+                    context="{'default_model': 'stock.location'}"
+                    options="{'color_field': 'color'}"/>
+            </xpath>
+        </field>
+    </record>
+
+     <record id="view_location_search_tags" model="ir.ui.view">
+        <field name="name">stock.location.search.tags</field>
+        <field name="model">stock.location</field>
+        <field name="inherit_id" ref="stock.view_location_search"/>
+        <field name="arch" type="xml">
+            <xpath expr="//search" position="inside">
+                <field name="generic_tag_ids"/>
+                <field name="search_tag_id"/> <!-- For direct searching (items that contain selected tag)-->
+                <field name="search_no_tag_id"/> <!-- For inverse searching (items that do not contain selected tag)-->
+            </xpath>
+        </field>
+    </record>
+
+    <record id="view_location_tree2_tags" model="ir.ui.view">
+        <field name="name">stock.location.tree.tags</field>
+        <field name="model">stock.location</field>
+        <field name="inherit_id" ref="stock.view_location_tree2"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='storage_category_id']" position="after">
+                <field name="generic_tag_ids"
+                    widget="many2many_tags"
+                    placeholder="Tags..."
+                    options="{'color_field': 'color'}"/>
+            </xpath>
+        </field>
+    </record>
+
+</odoo>

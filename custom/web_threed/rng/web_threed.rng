@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rng:grammar xmlns:rng="http://relaxng.org/ns/structure/1.0"
+             xmlns:a="http://relaxng.org/ns/annotation/1.0"
+             datatypeLibrary="http://www.w3.org/2001/XMLSchema-datatypes">
+    <rng:define name="any">
+        <rng:element>
+            <rng:anyName/>
+            <rng:zeroOrMore>
+                <rng:choice>
+                    <rng:attribute>
+                        <rng:anyName/>
+                    </rng:attribute>
+                    <rng:text/>
+                    <rng:ref name="any"/>
+                </rng:choice>
+            </rng:zeroOrMore>
+        </rng:element>
+    </rng:define>
+    <rng:define name="threed">
+        <rng:element name="threed">
+            <rng:optional><rng:attribute name="name"/></rng:optional>
+            <rng:optional><rng:attribute name="no_area_loaded"/></rng:optional>
+         	<rng:optional><rng:attribute name="no_item"/></rng:optional>
+             <rng:optional><rng:attribute name="auto_refresh"/></rng:optional>
+            <rng:optional>
+                <rng:element name="camera">
+                    <rng:optional><rng:attribute name="x"/></rng:optional>
+                    <rng:optional><rng:attribute name="y"/></rng:optional>
+                    <rng:optional><rng:attribute name="z"/></rng:optional>
+                    <rng:optional><rng:attribute name="fov"/></rng:optional>
+                </rng:element>
+            </rng:optional>
+            <rng:element name="scene">
+                <rng:element name="ground">
+                    <rng:element name="field">
+                        <rng:attribute name="name"/>
+                        <rng:attribute name="type"/>
+                        <rng:attribute name="relation"/>
+                        <rng:element name="planimetry">
+                            <rng:attribute name="name_field"/>
+                            <rng:attribute name="image_field"/>
+                            <rng:attribute name="sizex_field"/>
+                            <rng:attribute name="sizey_field"/>
+                            <rng:attribute name="sizez_field"/>
+                        </rng:element>
+                    </rng:element>
+                </rng:element>
+                <rng:element name="objects">
+                    <rng:oneOrMore>
+                        <rng:element name="field">
+                            <rng:attribute name="name"/>
+                            <rng:optional><rng:attribute name="type"/></rng:optional>
+                            <rng:optional><rng:attribute name="axis"/></rng:optional>
+                            <rng:optional><rng:attribute name="relation"/></rng:optional>
+                        </rng:element>
+                    </rng:oneOrMore>
+                </rng:element>
+            </rng:element>
+            <rng:optional>
+                <rng:element name="legend">
+                    <rng:optional><rng:attribute name="comodel_name"/></rng:optional>
+                    <rng:optional><rng:attribute name="name_field"/></rng:optional>
+                    <rng:optional><rng:attribute name="color_field"/></rng:optional>
+                    <rng:optional><rng:attribute name="opacity_field"/></rng:optional>
+                </rng:element>
+            </rng:optional>
+            <rng:optional>
+                <rng:element name="templates">
+                    <rng:oneOrMore>
+                        <rng:ref name="any"/>
+                    </rng:oneOrMore>
+                </rng:element>
+            </rng:optional>
+        </rng:element>
+    </rng:define>
+    <rng:start>
+        <rng:choice>
+            <rng:ref name="threed" />
+        </rng:choice>
+    </rng:start>
+</rng:grammar>

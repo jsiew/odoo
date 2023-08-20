@@ -1,0 +1,682 @@
+<odoo>
+    <data>
+        <record model="ir.ui.view" id="em_appointment_user_list">
+            <field name="name">Em Appointment user list</field>
+            <field name="model">em.appointment.user</field>
+            <field name="arch" type="xml">
+                <tree>
+                    <field name="user_id"/>
+                </tree>
+            </field>
+        </record>
+
+        <record model="ir.ui.view" id="em_appointment_user_kanban">
+            <field name="name">Em Appointment user kanban</field>
+            <field name="model">em.appointment.user</field>
+            <field name="arch" type="xml">
+                <kanban class="o_kanban_mobile">
+                    <templates>
+                        <t t-name="kanban-box">
+                            <div class="oe_kanban_content oe_kanban_global_click">
+                                <div class="h2">
+                                    <field name="user_id"/>
+                                </div>
+                                <div class="row" t-if="!selection_mode">
+                                    <div class="col-6">
+                                        <button type="object" class="btn btn-primary mt-1"
+                                                name="appointment_system_form_view">Appointments
+                                        </button>
+                                        <button type="object" class="btn btn-primary mt-1"
+                                                name="appointment_system_form_view_today">Today
+                                        </button>
+                                        <button type="object" class="btn btn-primary mt-1"
+                                                name="appointment_system_form_view_next">Upcoming
+                                        </button>
+                                    </div>
+                                    <div class="col-6">
+                                        <div class="row">
+                                            <a type="object" class="col-12" name="appointment_system_list_view_draft">
+                                                Draft
+                                            </a>
+                                            <a type="object" class="col-12" name="appointment_system_list_view_confirm">
+                                                Confirm
+                                            </a>
+                                            <a type="object" class="col-12" name="appointment_system_list_view_expire">
+                                                Expire
+                                            </a>
+                                            <a type="object" class="col-12" name="appointment_system_list_view_close">
+                                                Completed
+                                            </a>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </t>
+                    </templates>
+                </kanban>
+            </field>
+        </record>
+
+        <record id="em_appointment_system_user" model="ir.actions.act_window">
+            <field name="name">Appointment System</field>
+            <field name="res_model">em.appointment.system</field>
+            <field name="type">ir.actions.act_window</field>
+            <field name="view_mode">tree,form</field>
+            <field name="domain"/>
+            <field name="context"/>
+        </record>
+
+        <record id="view_em_appointment_system_calendar" model="ir.ui.view">
+            <field name="name">Em Appointment System calendar</field>
+            <field name="model">em.appointment.system</field>
+            <field name="arch" type="xml">
+                <calendar date_start="date_time" color="state" hide_time="true" event_limit="5">
+                    <field name="currency_id" invisible="1"/>
+                    <field name="partner_id" avatar_field="image_128"/>
+                    <field name="user_id" avatar_field="image_128"/>
+                    <field name="amount" widget="monetary"/>
+                    <field name="state" filters="1" invisible="1"/>
+                </calendar>
+            </field>
+        </record>
+
+        <record model="ir.ui.view" id="em_appointment_system_list">
+            <field name="name">Em Appointment System list</field>
+            <field name="model">em.appointment.system</field>
+            <field name="arch" type="xml">
+                <tree>
+                    <field name="name"/>
+                    <field name="designation_id" string="Appointment Type"/>
+                    <field name="date_time" string="Date"/>
+                    <field name="day_of_week_id" string="Day"/>
+                    <field name="user_id" string="Resident"/>
+                    <field name="partner_id" string="Visitor"/>
+                    <field name="reason" string="Remark"/>
+                    <field name="date" invisible="1"/>
+                    <field name="amount" invisible="1"/>
+                    <field name="currency_id" invisible="1"/>
+                    <field name="state" decoration-warning="state == 'draft'" decoration-danger="state == 'expire'"
+                           decoration-success="state == 'done'" decoration-info="state == 'confirm'" widget="badge"/>
+                    <!-- <field name="payment_state" decoration-warning="payment_state == 'not_paid'"
+                           decoration-danger="payment_state == 'reversed'"
+                           decoration-success="payment_state == 'paid'" decoration-info="payment_state == 'in_payment'"
+                           widget="badge"/> -->
+                </tree>
+            </field>
+        </record>
+
+        <record id="em_appointment_system_view_kanban" model="ir.ui.view">
+            <field name="name">Em Appointment System kanban</field>
+            <field name="model">em.appointment.system</field>
+            <field name="arch" type="xml">
+                <kanban class="o_kanban_mobile">
+                    <field name="currency_id" invisible="1"/>
+                    <templates>
+                        <t t-name="kanban-box">
+                            <div class="oe_kanban_content oe_kanban_global_click">
+                                <div class="row">
+                                    <div class="col-8 font-weight-bold">
+                                        <field name="name"/>
+                                    </div>
+                                    <div class="col-4">
+                                        <field name="state" class="float-right" decoration-warning="state == 'draft'"
+                                               decoration-danger="state == 'expire'"
+                                               decoration-success="state == 'done'"
+                                               decoration-info="state == 'confirm'" widget="badge"/>
+                                    </div>
+                                </div>
+                                <div class="row">
+                                    <div class="col-12">
+                                        <field name="partner_id"/>
+                                    </div>
+
+                                </div>
+                                <div class="row">
+                                    <div class="col-12">
+                                        <field name="date"/>
+                                        <field name="day_of_week_id"/>
+                                    </div>
+
+                                </div>
+                                <div class="row">
+                                    <div class="col-9 ">
+                                        <field name="slot_of_time_id"/>
+                                    </div>
+                                    <div class="col-3">
+                                        <field name="amount"/>
+                                    </div>
+                                </div>
+                            </div>
+                        </t>
+                    </templates>
+                </kanban>
+            </field>
+        </record>
+
+        <record model="ir.ui.view" id="em_appointment_system_search">
+            <field name="name">Em Appointment System search</field>
+            <field name="model">em.appointment.system</field>
+            <field name="arch" type="xml">
+                <search>
+                    <field name="name"/>
+                    <field name="designation_id"/>
+                    <field name="day_of_week_id"/>
+                    <field name="user_id"/>
+                    <field name="partner_id"/>
+                    <field name="reason"/>
+                    <field name="date"/>
+                    <filter string="Confirmed" name="order_confirmed" domain="[('state', '=', 'confirm')]"/>
+                    <filter string="Draft" name="order_draft" domain="[('state', '=', 'draft')]"/>
+                    <filter string="Expire" name="order_expire" domain="[('state', '=', 'expire')]"/>
+                    <filter string="Close" name="order_close" domain="[('state', '=', 'done')]"/>
+                    <filter string="User" name="order_user" domain="[('user_id', '=', uid)]"/>
+                    <group string="Group By" expand="1">
+                        <filter string="User" name="group_by_user_id"
+                                context="{'group_by': 'user_id'}"/>
+                        <filter string="Client" name="group_by_partner_id"
+                                context="{'group_by': 'partner_id'}"/>
+                    </group>
+                </search>
+            </field>
+        </record>
+
+        <record model="ir.ui.view" id="em_appointment_system_form">
+            <field name="name">Em Appointment System form</field>
+            <field name="model">em.appointment.system</field>
+            <field name="arch" type="xml">
+                <form>
+                    <header>
+                        <button name="action_confirm" class="btn btn-primary" type="object" string="Confirm"
+                                attrs="{'invisible':[('state','!=','draft')]}"/>
+                        <button name="pay_amount" class="btn btn-primary" type="object" string="Pay"
+                                attrs="{'invisible':['|','|',('invoice_id','=',False),('payment_state','=','paid'), ('state','in',['expire','done','cancel'])]}"/>
+                        <button name="close" class="btn btn-primary" type="object" string="Mark as Complete"
+                                groups="em_appointment_system.group_eas"
+                                attrs="{'invisible':['|',('state','in',['draft','done','cancel']), ('payment_state','!=','paid')]}"/>
+                        <button name="manual_mail" class="" type="object" string="Send Mail"/>
+                        <button name="expire" class="" type="object" string="Expire"
+                                groups="em_appointment_system.group_eas"
+                                attrs="{'invisible':[('state','in',['draft','done','expire','cancel'])]}"/>
+                        <button name="cancel" string="Cancel" type="object"
+                                attrs="{'invisible':[('state','not in',['draft','confirm'])]}"/>
+                        <field name="state" widget="statusbar" statusbar_visible="draft,confirm,done"/>
+                    </header>
+                    <sheet>
+                        <!-- <div class="oe_button_box" name="button_box">
+                            <button name="action_view_sale_order"
+                                    type="object"
+                                    class="oe_stat_button"
+                                    icon="fa-pencil-square-o"
+                                    attrs="{'invisible': [('order_count', '=', 0)]}">
+                                <field name="order_count" widget="statinfo" string="Sale Order"/>
+                            </button>
+                            <button name="action_view_invoice"
+                                    type="object"
+                                    class="oe_stat_button"
+                                    icon="fa-pencil-square-o"
+                                    attrs="{'invisible': [('invoice_count', '=', 0)]}">
+                                <field name="invoice_count" widget="statinfo" string="Invoices"/>
+                            </button>
+                        </div>
+                        <div class="badge-pill badge-warning float-right"
+                             attrs="{'invisible': ['|','|',  ('state', '=', 'draft'), ('payment_state', '!=', 'not_paid'), ('amount', '==', 0)]}">
+                            Not Paid
+                        </div>
+                        <div class="badge-pill badge-info float-right"
+                             attrs="{'invisible': ['|','|',  ('state', '=', 'draft'), ('payment_state', '!=', 'in_payment'), ('amount', '==', 0)]}">
+                            In Payment
+                        </div>
+                        <div class="badge-pill badge-success float-right"
+                             attrs="{'invisible': ['|','|',  ('state', '=', 'draft'), ('payment_state', '!=', 'paid'), ('amount', '==', 0)]}">
+                            Paid
+                        </div> -->
+                        <h1>
+                            <field name="name"/>
+                        </h1>
+                        <group>
+                            <group>
+                                <field name="self_created" invisible="1"/>
+                                <field name="designation_id"
+                                       attrs="{'readonly':['|',('state','=','done'), ('self_created','=',True)]}"
+                                       options="{'no_create_edit': True, 'no_open': True, 'no_create': True}"
+                                       string="Resident Type"/>
+                                <field name="user_id"
+                                       attrs="{'readonly':['|',('state','=','done') ,('self_created','=',True)]}"
+                                       string="Resident"/>
+                                <field name="appointment_type_id" attrs="{'readonly':[('state','=','done')]}"
+                                       options="{'no_create_edit': True, 'no_open': True, 'no_create': True}"/>
+                                <field name="date" attrs="{'readonly':[('state','=','done')]}"
+                                       string="Visit Date"/>
+                                <field name="day_of_week_id" readonly="1" force_save="1" string="Week Day"/>
+                                <field name="slot_of_time_id"
+                                       attrs="{'readonly':[('state','in',['done','cancel'])],'required':[('state','!=','cancel')]}"
+                                       options="{'no_create_edit': True, 'no_open': True, 'no_create': True}"
+                                       string="Time Slot"/>
+                                <field name="show_address" invisible="1"/>
+                                <field name="location_address" attrs="{'invisible': [('show_address', '=', False)]}"/>
+                            </group>
+                            <group>
+                                <field name="create_date"/>
+                                <field name="partner_id" attrs="{'readonly':[('state','=','done')]}"/>
+                                <field name="amount"  invisible="1"/>
+                                <field name="currency_id"  invisible="1"/>
+                                <field name="client"/>
+                                <field name="invoice_id" invisible="1"/>
+                                <field name="payment_state" invisible="1"/>
+                                <field name="canceled_by_user" invisible="1" readonly="1"
+                                       string="Canceled By Appointee"/>
+                            </group>
+                            <label class="font-weight-bold" for="reason"/>
+                            <field name="reason" attrs="{'readonly':[('state','=','done')]}"/>
+
+                            <label class="font-weight-bold" for="enable_additional_item" invisible="1"/>
+                            <field name="enable_additional_item" invisible="1"/>
+                            <field name="company_id" invisible="1"/>
+                        </group>
+                        <field name="additional_item_line_ids"
+                               attrs="{'invisible': [('enable_additional_item','=',False)]}">
+                            <tree editable="bottom">
+                                <field name="sequence" widget="handle"/>
+                                <field name="product_uom_category_id" invisible="1"/>
+                                <field name="product_id" options="{'no_open': True}"
+                                       domain="[('sale_ok', '=', True), '|', ('company_id', '=', False), ('company_id', '=', parent.company_id)]"/>
+                                <field name="name" widget="section_and_note_text" optional="show"/>
+                                <field name="product_uom_qty"/>
+                                <field name="product_uom"
+                                       force_save="1"
+                                       string="UoM"
+                                       context="{'company_id': parent.company_id}"
+                                       groups="uom.group_uom"
+                                       options='{"no_open": True}'
+                                       optional="show"/>
+                                <field name="price_unit"/>
+                                <field name="tax_id"
+                                       widget="many2many_tags"
+                                       options="{'no_create': True}"
+                                       domain="[('type_tax_use','=','sale'),('company_id','=',parent.company_id)]"
+                                       optional="show"/>
+                                <field name="discount" string="Disc.%" groups="product.group_discount_per_so_line"
+                                       optional="show" widget="product_discount"/>
+                                <field name="price_subtotal" widget="monetary"
+                                       groups="account.group_show_line_subtotals_tax_excluded"/>
+                                <field name="price_total" widget="monetary"
+                                       groups="account.group_show_line_subtotals_tax_included"/>
+                                <field name="currency_id" invisible="1"/>
+                                <field name="price_tax" invisible="1"/>
+                                <field name="company_id" invisible="1"/>
+                            </tree>
+                        </field>
+
+                        <button name="order_items" class="btn btn-primary" type="object"
+                                string="Order Additional Items for Client"
+                                attrs="{'invisible': ['|',('enable_additional_item','=',False),('state','!=','confirm')]}"/>
+                    </sheet>
+                    <div class="oe_chatter">
+                        <field name="message_follower_ids" class="mail_followers"/>
+                        <field name="message_ids" class="mail_thread"/>
+                    </div>
+                </form>
+            </field>
+        </record>
+
+        
+        <record model="ir.ui.view" id="designation_designation_list">
+            <field name="name">Designation list</field>
+            <field name="model">designation.designation</field>
+            <field name="arch" type="xml">
+                <tree editable="bottom">
+                    <field name="name"/>
+                </tree>
+            </field>
+        </record>
+
+        <record model="ir.ui.view" id="day_of_week_list">
+            <field name="name">Day of weeks</field>
+            <field name='model'>day.of.week</field>
+            <field name="arch" type="xml">
+                <tree>
+                    <field name="display_name" invisible="1"/>
+                    <field name="name"/>
+                </tree>
+            </field>
+        </record>
+
+        <record model="ir.ui.view" id="day_of_week_form">
+            <field name="name">Day of weeks</field>
+            <field name='model'>day.of.week</field>
+            <field name="arch" type="xml">
+                <form>
+                    <sheet>
+                        <group>
+                            <group>
+                                <field name="display_name" invisible="1"/>
+                                <field name="name"/>
+                            </group>
+                            <group>
+                            </group>
+                            <field name="slot_of_time_ids">
+                                <tree editable="bottom">
+                                    <field name="time_from" widget="float_time"/>
+                                    <field name="time_to" widget="float_time"/>
+                                </tree>
+                                <form>
+                                    <group>
+                                        <group>
+                                            <field name="time_from" widget="float_time"/>
+                                        </group>
+                                        <group>
+                                            <field name="time_to" widget="float_time"/>
+                                        </group>
+                                    </group>
+                                    <field name="slot_book_line_ids">
+                                        <tree>
+                                            <field name="blocked"/>
+                                            <field name="session_id"/>
+                                            <field name="blocked_date"/>
+                                            <field name="blocked_for_date"/>
+                                        </tree>
+                                    </field>
+                                </form>
+                            </field>
+                        </group>
+                    </sheet>
+                </form>
+            </field>
+        </record>
+
+        <record id="action_contacts_appointee" model="ir.actions.act_window">
+            <field name="name">Residents</field>
+            <field name="type">ir.actions.act_window</field>
+            <field name="res_model">res.partner</field>
+            <field name="view_mode">kanban,tree,form,activity</field>
+            <field name="search_view_id" ref="base.view_res_partner_filter"/>
+            <field name="domain">[('app_user','=',True)]</field>
+            <field name="context">{'default_is_company': True}</field>
+            <field name="help" type="html">
+                <p class="o_view_nocontent_smiling_face">
+                    Create a contact in your address book
+                </p>
+            </field>
+        </record>
+
+        <record id="inherit_res_partner" model="ir.ui.view">
+            <field name="name">Res Partner</field>
+            <field name="model">res.partner</field>
+            <field name="inherit_id" ref="base.view_partner_form"/>
+            <field name="arch" type="xml">
+                <xpath expr="//notebook" position="before">
+                    <group>
+                        <group>
+                            <field name="app_user" invisible="1"/>
+                            <field name="app_user" groups="em_appointment_system.group_eas_manager" string="Is Resident"/>
+                        </group>
+                    </group>
+                </xpath>
+                <xpath expr="//page[last()]" position="before">
+                    <page string="Resident Details" attrs="{'invisible':[('app_user','=',False)]}">
+                        <group>
+                            <group>
+                                <field name="designation_id" string="Resident Type"/>
+                                <field name="location_address"/>
+                            </group>
+                            <group>
+                                <field name="amount" invisible="1"/>
+                                <field name="currency_id" readonly="0" invisible="1"/>
+                                <field name="duration" readonly="0"/>
+                                <field name="appointment_type_ids" widget="many2many_tags"
+                                       attrs="{'required':[('app_user', '!=', False)]}"/>
+                            </group>
+
+                            <label for="day_of_week_ids" class="font-weight-bold"/>
+                            <field name="day_of_week_ids">
+                                <tree>
+                                    <field name="name"/>
+                                    <field name="slot_of_time_ids" widget="many2many_tags"/>
+                                </tree>
+                            </field>
+                        </group>
+
+                    </page>
+                </xpath>
+            </field>
+        </record>
+
+        <record model="ir.ui.view" id="slot_of_time_list">
+            <field name="name">Day of weeks tree</field>
+            <field name='model'>slot.of.time</field>
+            <field name="arch" type="xml">
+                <tree>
+                    <field name="time_from" widget="float_time"/>
+                    <field name="time_to" widget="float_time"/>
+                    <field name="day_of_week_id"/>
+                    <field name="display_name" invisible="1"/>
+                </tree>
+            </field>
+        </record>
+
+        <record model="ir.ui.view" id="slot_of_time_form">
+            <field name="name">Day of weeks form</field>
+            <field name='model'>slot.of.time</field>
+            <field name="arch" type="xml">
+                <form>
+                    <sheet>
+                        <group>
+                            <group>
+                                <field name="time_from" widget="float_time"/>
+                                <field name="time_to" widget="float_time"/>
+                                <field name="day_of_week_id"/>
+                                <field name="display_name" invisible="1"/>
+                            </group>
+                        </group>
+                    </sheet>
+                </form>
+            </field>
+        </record>
+
+        <record id="eas_res_config_settings_view_form" model="ir.ui.view">
+            <field name="name">res.config.settings.view.form.inherit.website</field>
+            <field name="model">res.config.settings</field>
+            <field name="priority" eval="20"/>
+            <field name="inherit_id" ref="base.res_config_settings_view_form"/>
+            <field name="arch" type="xml">
+                <xpath expr="//div[hasclass('settings')]" position="inside">
+                    <div class="app_settings_block" data-string="Appointment Settings" string="Appointment Settings"
+                         data-key="em_appointment_system">
+                        <h2>Appointment</h2>
+                        <div class=" " name="catalog_setting_container">
+
+                            <div class="row mt16 o_settings_container">
+                                <div class="col-12 col-lg-6 o_setting_box" title="Set option according to requirement.">
+                                    <div class="o_setting_left_pane">
+                                    </div>
+                                    <div class="o_setting_right_pane">
+                                        <label class="o_form_label" for="slot_reserve_time"
+                                               string="Maximum time to reserve slot for client"/>
+                                        <field name="slot_reserve_time"/>
+                                        <div class="text-muted">
+                                            Maximum time to reserve slot for client.
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="col-12 col-lg-6 o_setting_box" title="Set option according to requirement.">
+                                    <div class="o_setting_left_pane">
+                                        <field name="allow_mail_to_user"/>
+                                    </div>
+                                    <div class="o_setting_right_pane">
+                                        <label class="o_form_label" for="allow_mail_to_user"
+                                               string="Allow mail to Resident"/>
+                                        <div class="text-muted">
+                                            Allow to send mail to user on confirm.
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="col-12 col-lg-6 o_setting_box" title="Set option according to requirement.">
+                                    <div class="o_setting_left_pane">
+                                        <field name="allow_mail_to_partner"/>
+                                    </div>
+                                    <div class="o_setting_right_pane">
+                                        <label class="o_form_label" for="allow_mail_to_partner"
+                                               string="Allow mail to Client"/>
+                                        <div class="text-muted">
+                                            Allow to send mail to client on confirm.
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="col-12 col-lg-6 o_setting_box" title="Set option according to requirement.">
+                                    <div class="o_setting_left_pane">
+                                        <field name="allow_reminder_to_partner"/>
+                                    </div>
+                                    <div class="o_setting_right_pane">
+                                        <label class="o_form_label" for="allow_reminder_to_partner"
+                                               string="Allow reminder to Client"/>
+                                        <div class="text-muted">
+                                            Allow to send reminder to client.
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </xpath>
+            </field>
+        </record>
+
+        <record model="ir.ui.view" id="appointment_type_list">
+            <field name="name">Appointment Type list</field>
+            <field name="model">appointment.type</field>
+            <field name="arch" type="xml">
+                <tree editable="bottom">
+                    <field name="name"/>
+                    <field name="address_need" invisible="1"/>
+                </tree>
+            </field>
+        </record>
+
+
+        <record id="res_config_settings_eas_form_view" model="ir.actions.act_window">
+            <field name="name">Settings</field>
+            <field name="type">ir.actions.act_window</field>
+            <field name="res_model">res.config.settings</field>
+            <field name="view_id" ref="eas_res_config_settings_view_form"/>
+            <field name="view_mode">form</field>
+            <field name="target">inline</field>
+            <field name="context">{'module' : 'em_appointment_system'}</field>
+        </record>
+
+
+        <record model="ir.actions.act_window" id="em_appointment_user_action_window">
+            <field name="name">Appointment</field>
+            <field name="res_model">em.appointment.user</field>
+            <field name="view_mode">kanban,tree</field>
+            <field name="context">{'create': False}</field>
+            <field name="help" type="html">
+                <p class="o_view_nocontent_smiling_face">
+                    There is no appointment created for you, When created that will be visible here.
+                </p>
+            </field>
+        </record>
+
+        <record model="ir.actions.act_window" id="em_appointment_system_action_window">
+            <field name="name">Appointments</field>
+            <field name="res_model">em.appointment.system</field>
+            <field name="view_mode">kanban,tree,form,calendar</field>
+            <field name="context">{'search_default_order_user':1}</field>
+            <field name="help" type="html">
+                <p class="o_view_nocontent_smiling_face">
+                    There is no appointment created for you, When created that will be visible here.
+                </p>
+            </field>
+        </record>
+
+        <record model="ir.actions.act_window" id="em_appointment_system_action_window_new_apt">
+            <field name="name">New Visit</field>
+            <field name="res_model">em.appointment.system</field>
+            <field name="view_mode">form</field>
+        </record>
+
+        <record model="ir.actions.act_window" id="designation_designation_action_window">
+            <field name="name">Resident Types</field>
+            <field name="res_model">designation.designation</field>
+            <field name="view_mode">tree,form</field>
+        </record>
+
+        <record model="ir.actions.act_window" id="appointment_type_action_window">
+            <field name="name">Visit Types</field>
+            <field name="res_model">appointment.type</field>
+            <field name="view_mode">tree,form</field>
+        </record>
+
+
+        <record model="ir.actions.act_window" id="day_of_week_action_window">
+            <field name="name">Day Of Week Window</field>
+            <field name="res_model">day.of.week</field>
+            <field name="view_mode">tree,form</field>
+        </record>
+
+        <record model="ir.actions.act_window" id="slot_of_time_action_window">
+            <field name="name">Slot Of Time Window</field>
+            <field name="res_model">slot.of.time</field>
+            <field name="view_mode">tree,form</field>
+        </record>
+        <record model="ir.actions.act_window" id="eas_account_move_action_window">
+            <field name="name">Account Move</field>
+            <field name="res_model">account.move</field>
+            <field name="view_mode">tree,form</field>
+            <field name="domain">[('invoice_user_id','=','Account_Move')]</field>
+        </record>
+
+        <menuitem name="Appointment System" id="em_appointment_system_menu_root"/>
+
+        <menuitem name="Dashboard" id="em_appointment_user_menu_appointment_system" sequence="1"
+                  parent="em_appointment_system_menu_root" action="em_appointment_user_action_window"/>
+
+        <menuitem name="Appointments" id="em_appointment_system_menu_appointment_system" sequence="2"
+                  parent="em_appointment_system_menu_root"/>
+
+        <menuitem id="res_partner_menu_contacts" name="Contacts" action="contacts.action_contacts" sequence="3"
+                  parent="em_appointment_system_menu_root"/>
+        <menuitem name="Invoice" id="eas_invoice" parent="em_appointment_system_menu_root" sequence="4"
+                  action="eas_account_move_action_window"/>
+
+        <menuitem id="em_appointment_system_menu_conf" name="Configuration"
+                  parent="em_appointment_system_menu_root"/>
+
+        <menuitem name="Create New Appointment" id="em_appointment_system_new_appointment"
+                  parent="em_appointment_system_menu_appointment_system"
+                  action="em_appointment_system_action_window_new_apt" sequence="1"/>
+
+        <menuitem name="Appointments" id="em_appointment_system_appointment_system_list_item"
+                  parent="em_appointment_system_menu_appointment_system"
+                  action="em_appointment_system_action_window"/>
+
+        <menuitem name="Resident Types" id="designation_designation_list_item"
+                  parent="em_appointment_system_menu_conf" groups="em_appointment_system.group_eas_manager"
+                  action="designation_designation_action_window"/>
+
+        <menuitem name="Appointee" id="appointee_list_item"
+                  parent="em_appointment_system_menu_conf"
+                  action="action_contacts_appointee"/>
+
+        <menuitem name="Appointment Type" id="appointment_type_list_item"
+                  parent="em_appointment_system_menu_conf" groups="em_appointment_system.group_eas_manager"
+                  action='appointment_type_action_window'/>
+
+        <menuitem id="appointment_system_configuration_settings"
+                  name="Settings" sequence="1"
+                  parent="em_appointment_system_menu_conf"
+                  action="res_config_settings_eas_form_view"/>
+
+
+        <record id="model_em_appointment_system_Cancel" model="ir.actions.server">
+            <field name="name">Postpone Appointment</field>
+            <field name="model_id" ref="em_appointment_system.model_em_appointment_system"/>
+            <field name="binding_model_id" ref="em_appointment_system.model_em_appointment_system"/>
+            <field name="binding_view_types">form,list</field>
+            <field name="state">code</field>
+            <field name="code">action = records.appoint_cancel()</field>
+        </record>
+    </data>
+</odoo>

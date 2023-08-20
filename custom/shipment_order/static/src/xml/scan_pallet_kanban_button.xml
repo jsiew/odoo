@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates id="template" xml:space="preserve">
+    <t t-extend="KanbanView.buttons" t-name="scan_pallet.button">
+       <t t-jquery="div.o_cp_bottom_left" t-operation="inner">
+            <button 
+                class="btn btn-primary open_wizard_action_kanban oe_highlight"
+                type="button">Scan Pallet</button>
+       </t>
+   </t>
+</templates>

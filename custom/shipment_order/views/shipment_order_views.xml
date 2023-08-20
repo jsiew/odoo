@@ -1,0 +1,323 @@
+<?xml version='1.0' encoding='utf-8'?>
+<odoo>
+    <!--CONTAINER-->
+    <record id="shipment_order_container_view_form" model="ir.ui.view">
+        <field name="name">shipment_order.containere.view.form</field>
+        <field name="model">shipment_order.container</field>
+        <field name="arch" type="xml">
+            <form string="Container" create="false">
+                <sheet>
+                    <group>
+                        <field name="company_id" invisible="1"/>
+                        <field name="container_number"/>
+                        <field name="container_number_actual"/>
+                        <field name="seal_number"/>
+                        <field name="container_size"/>
+                        <field name="picking_id" readonly="1"/>
+                        <field name="outgoing_picking_id" readonly="1"/>
+                    </group>
+                    <hr />
+                    <p><h4 class="modal-title text-break">Pallets</h4></p>
+                    <field name="pallet_ids" readonly="1">
+                        <tree>
+                            <field name="company_id" invisible="1"/>
+                            <field name="name"/>
+                            <field name="cargo_length"/>
+                            <field name="cargo_width"/>
+                            <field name="cargo_height"/>
+                        </tree>
+                    </field>
+                </sheet>
+            </form>
+        </field>
+    </record>
+    <!--PALLET-->
+    <record id="shipment_order_pallet_view_form" model="ir.ui.view">
+        <field name="name">shipment_order.pallet.view.form</field>
+        <field name="model">shipment_order.pallet</field>
+        <field name="arch" type="xml">
+            <form string="Pallet Details" readonly="1" create="false" edit="false">
+                <sheet>
+                    <group>
+                        <field name="company_id" invisible="1"/>
+                        <field name="qr_code_data"/>
+                        <field name="name"/>
+                        <field name="container_number"/>
+                        <field name="container_number_actual"/>
+                        <field name="cargo_length"/>
+                        <field name="cargo_width"/>
+                        <field name="cargo_height"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!--WCS TRANSPORT ORDER-->
+    <record id="shipment_order_move_view_tree" model="ir.ui.view">
+        <field name="name">shipment_order.move.tree</field>
+        <field name="model">shipment_order.move</field>
+        <field name="arch" type="xml">
+            <tree  default_order='wcs_timestamp desc' create="false">
+                <field name="location_id" string="Pickup"/>
+                <field name="location_dest_id" string="Destination"/>
+                <field name="pallet_id"/>
+                <field name="wcs_overall_state"
+                    decoration-primary="wcs_overall_state == 'created'"
+                    decoration-success="wcs_overall_state == 'completed'"
+                    decoration-info="wcs_overall_state not in ['cancelled','error','completed','cancelling','created']"
+                    decoration-danger="wcs_overall_state in ['cancelled','error','cancelling']"
+                    widget="badge"/>
+                <field name="wcs_id_1"/>
+                <field name="wcs_id_2"/>
+                <field name="wcs_timestamp"/>
+                <field name="picking_id"/>
+            </tree>
+        </field>
+    </record>
+    <record id="shipment_order_move_view_form" model="ir.ui.view">
+        <field name="name">shipment_order.move.view.form</field>
+        <field name="model">shipment_order.move</field>
+        <field name="arch" type="xml">
+            <form string="WCS Transport Order Details" readonly="1" create="false" edit="false">
+                <sheet>
+                    <group>
+                        <field name="company_id" invisible="1"/>
+                        <field name="qr_code"/>
+                    </group>
+                    <group>
+                        <group>
+                            <field name="location_id"/>
+                            <field name="wcs_overall_state"
+                                decoration-primary="wcs_overall_state == 'created'"
+                                decoration-success="wcs_overall_state == 'completed'"
+                                decoration-info="wcs_overall_state not in ['cancelled','error','completed','cancelling','created']"
+                                decoration-danger="wcs_overall_state in ['cancelled','error','cancelling']"
+                                widget="badge"/>
+                            <field name="wcs_order_desc"/>
+                            <field name="wcs_state_summary" />
+                            <field name="wcs_timestamp"/>
+                        </group>
+                        <group>
+                            <field name="location_dest_id"/>
+                            <field name="pallet_id"/>
+                            <field name="ref_number"/>
+                            <field name="picking_id"/>
+                        </group>
+                    </group>
+                    <hr />
+                    <p><h4 class="modal-title text-break">Logs</h4></p>
+                    <field name="log_ids" readonly="1">
+                        <tree>
+                            <field name="wcs_message_type"
+                                decoration-primary="wcs_message_type == 'system'"
+                                decoration-info="wcs_message_type not in ['system','error']"
+                                decoration-danger="wcs_message_type == 'error'"
+                                widget="badge"/>
+                            <field name="remarks"/>
+                            <field name="wcs_message"/>
+                            <field name="wcs_id"/>
+                            <field name="wcs_message_code"/>
+                            <field name="wcs_notification_code"/>
+                            <field name="wcs_timestamp"/>
+                        </tree>
+                    </field>
+                </sheet>
+            </form>
+        </field>
+    </record>
+    <record id="shipment_order_move_search" model="ir.ui.view">
+        <field name="name">shipment_order.move.search</field>
+        <field name="model">shipment_order.move</field>
+        <field name="arch" type="xml">
+            <search string="WCS Orders">
+                <field name="wcs_id_summary"
+                    string="WCS ID"
+                    filter_domain="['|',('wcs_id_1', 'ilike', self),('wcs_id_2', 'ilike', self)]"/>
+                <field name="pallet_id"
+                    string="Pallet"
+                    filter_domain="[('pallet_id.name', 'ilike', self)]"/>
+                <field name="move_line_id"
+                    string="Container"
+                    filter_domain="['|',('move_line_id.container_number', 'ilike', self),('move_line_id.container_number_actual', 'ilike', self)]"/>
+                <field name="picking_id"
+                    string="BL/Bkg No."
+                    filter_domain="[('picking_id.ref_number', 'ilike', self)]"/>
+                <separator/>
+                <filter name="filter_wcs_date" date="wcs_timestamp" string="WCS Order Date" default_period="this_week"/>
+                <filter string="State: Error/Cancelled" name="wcs_overall_state" domain="['|',('wcs_state_1', 'in', ('error','cancelled','cancelling')),('wcs_state_2', 'in', ('error','cancelled','cancelling'))]"/>
+                <group expand="1" string="Group By">
+                    <filter string="Pallet ID" name="filter_pallet" context="{'group_by':'pallet_id'}"/>
+                    <filter string="BL/Bkg No." name="filter_ref" context="{'group_by':'picking_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <!--WCS TRANSPORT ORDER LOG-->
+    <record id="shipment_order_log_view_tree" model="ir.ui.view">
+        <field name="name">shipment_order.log.tree</field>
+        <field name="model">shipment_order.movelog</field>
+        <field name="arch" type="xml">
+            <tree default_order='wcs_timestamp desc' create="false">
+                <field name="wcs_message_type"
+                        decoration-primary="wcs_message_type == 'system'"
+                        decoration-info="wcs_message_type not in ['system','error']"
+                        decoration-danger="wcs_message_type == 'error'"
+                        widget="badge"/>
+                <field name="wcs_message"/>
+                <field name="remarks"/>
+                <field name="wcs_id" />
+                <field name="wcs_timestamp"/>
+            </tree>
+        </field>
+    </record>
+    <record id="shipment_order_movelog_view_form" model="ir.ui.view">
+        <field name="name">shipment_order.movelog.view.form</field>
+        <field name="model">shipment_order.movelog</field>
+        <field name="arch" type="xml">
+            <form readonly="1" create="false" edit="false">
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="wcs_message"/>
+                            <field name="wcs_message_type"
+                                decoration-primary="wcs_message_type == 'system'"
+                                decoration-info="wcs_message_type not in ['system','error']"
+                                decoration-danger="wcs_message_type == 'error'"
+                                widget="badge"/>
+                            <field name="wcs_message_code"/>
+                        </group>
+                        <group>
+                            <field name="wcs_notification_code"/>
+                            <field name="wcs_timestamp"/>
+                            <field name="wcs_id" />
+                        </group>
+                    </group>
+                    <group>
+                        <field name="remarks"/>
+                        <field name="wcs_raw_data_html" />
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+    <record id="shipment_order_movelog_search" model="ir.ui.view">
+        <field name="name">shipment_order.movelog.search</field>
+        <field name="model">shipment_order.movelog</field>
+        <field name="arch" type="xml">
+            <search string="WCS Order Logs">
+                <field name="transport_order"
+                    string="WCS ID"
+                    filter_domain="[('transport_order.wcs_id', 'ilike', self)]"/>
+                <field name="pallet_id"
+                    string="Pallet"
+                    filter_domain="[('transport_order.pallet_id.name', 'ilike', self)]"/>
+                <field name="container_number"
+                    string="Container"
+                    filter_domain="['|',('transport_order.move_line_id.container_number', 'ilike', self),('transport_order.move_line_id.container_number_actual', 'ilike', self)]"/>
+                <field name="ref_number"
+                    string="BL/Bkg No."
+                    filter_domain="[('transport_order.picking_id.ref_number', 'ilike', self)]"/>
+                <separator/>
+                <filter string="General Error" name="wcs_message_type" domain="[('transport_order', '=', None)]"/>
+                <filter string="Transport Order Error" name="wcs_message_type" domain="[('wcs_message_type', '=', 'error')]"/>
+                <filter string="Notification" name="wcs_message_type" domain="[('wcs_message_type', '=', 'notification')]"/>
+                <filter string="System" name="wcs_message_type" domain="[('wcs_message_type', '=', 'system')]"/>
+                <filter name="filter_log_date" date="wcs_timestamp" string="Log Date" default_period="this_week"/>
+                <group expand="" string="Group By">
+                    <filter string="Transport Order" name="transport_order" context="{'group_by':'transport_order'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <!--WCS ELEVATED TRAYS-->
+    <record id="shipment_order_elevated_tray_view_tree" model="ir.ui.view">
+        <field name="name">shipment_order.elevated.tray.tree</field>
+        <field name="model">shipment_order.elevated.tray</field>
+        <field name="arch" type="xml">
+            <tree default_order='priority'>
+                <field name="name"/>
+                <field name="open_side_code"/>
+                <field name="closed_side_code"/>
+                <field name="priority"/>
+            </tree>
+        </field>
+    </record>
+    <record id="shipment_order_elevated_tray_view_form" model="ir.ui.view">
+        <field name="name">shipment_order.elevated_tray.view.form</field>
+        <field name="model">shipment_order.elevated.tray</field>
+        <field name="arch" type="xml">
+            <form string="Elevated Tray Details">
+                <sheet>
+                    <group>
+                        <field name="name"/>
+                        <field name="open_side_code"/>
+                        <field name="closed_side_code"/>
+                        <field name="priority"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!--ACTIONS-->
+    <record
+        id="shipment_order.act_shipment_order_move"
+        model="ir.actions.act_window">
+        <field name="name">Shipment Move Action</field>
+        <field name="res_model">shipment_order.move</field>
+        <field name="view_mode">form</field>
+        <field name="view_id" ref="shipment_order_move_view_form"/>
+        <field name="target">new</field>
+    </record>
+    
+    <record model="ir.actions.act_window" id="shipment_order_wcs_move_action_window">
+        <field name="name">WCS Orders</field>
+        <field name="res_model">shipment_order.move</field>
+        <field name="type">ir.actions.act_window</field>
+        <field name="view_mode">tree,form</field>
+    </record>
+    <record model="ir.actions.act_window" id="shipment_order_wcs_log_action_window">
+        <field name="name">WCS Logs</field>
+        <field name="res_model">shipment_order.movelog</field>
+        <field name="type">ir.actions.act_window</field>
+        <field name="view_mode">tree,form</field>
+    </record>
+    <record model="ir.actions.act_window" id="shipment_order_elevated_trays_action_window">
+        <field name="name">Elevated Trays</field>
+        <field name="res_model">shipment_order.elevated.tray</field>
+        <field name="type">ir.actions.act_window</field>
+        <field name="view_mode">tree,form</field>
+    </record>
+    <record model="ir.actions.act_window" id="shipment_order_3d_window">
+        <field name="name">Warehouse 3D View</field>
+        <field name="res_model">stock.location</field>
+        <field name="type">ir.actions.act_window</field>
+        <field name="view_mode">threed</field>
+        <field name="domain">["&amp;",["id","child_of",8],["usage","=","internal"],["sizex","&gt;",0],["sizey","&gt;",0],["sizez","&gt;",0]]</field>
+        <field name="context">{'request_type':'tagged', 'active_id':8}</field>
+    </record>
+
+    <!--MENUS-->
+    <menuitem id="menu_shipment_order_wcs" name="WCS Orders" parent="stock.menu_stock_root" sequence="2"/>
+    <menuitem id="menu_warehouse_3d" name="Warehouse 3D View" parent="stock.menu_stock_root" sequence="3" action="shipment_order_3d_window"/>
+    <menuitem
+        action="shipment_order_wcs_move_action_window"
+        id="shipment_order_wcs_move_menu"
+        parent="menu_shipment_order_wcs" sequence="1"
+        name="WCS Orders"/>
+    <menuitem
+        action="shipment_order_wcs_log_action_window"
+        id="shipment_order_wcs_movelog_menu"
+        parent="menu_shipment_order_wcs" sequence="2"
+        name="WCS Logs"/>
+
+    <menuitem id="shipment_order_elevated_trays_menu" 
+            name="Elevated Trays"
+            parent="stock.menu_stock_config_settings" 
+            sequence="0" 
+            action="shipment_order_elevated_trays_action_window"
+            groups="base.group_system"/>
+</odoo>

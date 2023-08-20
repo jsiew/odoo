@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>       
+
+        <record id="res_config_settings_view_form_inherit" model="ir.ui.view">
+            <field name="name">res.config.settings.view.form.shipmentorder</field>
+            <field name="model">res.config.settings</field>
+            <field name="inherit_id" ref="base.res_config_settings_view_form" />
+            <field name="arch" type="xml">
+                <xpath expr="//div[hasclass('settings')]" position="inside">
+                    <div class="app_settings_block" data-string="Shipment Orders" string="Shipment Orders" data-key="shipment_order">
+                        <h2>Shipment Orders</h2>
+                        <div class="row mt16 o_settings_container" name="shipment_order_setting_container">
+                            <div class="col-12 o_setting_box">
+                                <div class="o_setting_left_pane" />
+                                <div class="o_setting_right_pane">
+                                    <span class="o_form_label">Pallet Max Height</span>
+                                    <div class="text-muted content-group mt16">
+                                        <span>Maximum height of any pallet</span>
+                                        <field name="shipment_pallet_max_height" class="text-center oe_inline" />
+                                        <span> cm</span>
+                                    </div>
+                                    <span class="o_form_label">Short Pallet Max Height</span>
+                                    <div class="text-muted content-group mt16">
+                                        <span>Maximum height of short pallets: </span>
+                                        <field name="shipment_short_pallet_max_height" class="text-center oe_inline" />
+                                        <span> cm</span>
+                                    </div>
+                                    <span class="o_form_label">WMS Interface URL</span>
+                                    <div class="text-muted content-group mt16">
+                                        <span>URL of the WMS Web Service e.g. http://192.168.1.100/WcsInterface: </span>
+                                        <field name="wms_interface_url" widget="url" />
+                                    </div>
+                                    <span class="o_form_label">WMS Interface API Key</span>
+                                    <div class="text-muted content-group mt16">
+                                        <span>API Key for WMS Web Service: </span>
+                                        <field name="wms_interface_api_key" />
+                                    </div>
+                                    <span class="o_form_label">WCS System Name</span>
+                                    <div class="text-muted content-group mt16">
+                                        <span>System name used when sending commands to WCS e.g. fm_x2: </span>
+                                        <field name="wcs_system_name"/>
+                                    </div>
+                                    <span class="o_form_label">WCS Subsystem ID: </span>
+                                    <div class="text-muted content-group mt16">
+                                        <span>Subystem ID used when sending commands to WCS e.g. 1: </span>
+                                        <field name="wcs_subsystem_id"/>
+                                    </div>
+                                    <span class="o_form_label">Validate QR Code</span>
+                                    <div class="text-muted content-group mt16">
+                                        <span>Whether AGV should scan and validate pallet QR codes  </span>
+                                        <field name="validate_qr"/>
+                                    </div>
+                                    <span class="o_form_label">Validate Elevated Tray QR Code</span>
+                                    <div class="text-muted content-group mt16">
+                                        <span>Whether AGV should scan and validate elevated tray QR codes  </span>
+                                        <field name="validate_elevated_tray_qr"/>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </xpath>
+            </field>
+        </record>
+        <record id="shipment_order_config_settings_action" model="ir.actions.act_window">
+            <field name="name">Shipment Order Settings</field>
+            <field name="type">ir.actions.act_window</field>
+            <field name="res_model">res.config.settings</field>
+            <field name="view_mode">form</field>
+            <field name="target">inline</field>
+            <field name="context">{'module' : 'shipment_order', 'bin_size': False}</field>
+        </record>
+
+        <menuitem id="shipment_order_config_settings_menu" name="Shipment Order Settings"
+            parent="stock.menu_stock_config_settings" 
+            sequence="0" 
+            action="shipment_order_config_settings_action"
+            groups="base.group_system"/>
+
+    </data>
+</odoo>

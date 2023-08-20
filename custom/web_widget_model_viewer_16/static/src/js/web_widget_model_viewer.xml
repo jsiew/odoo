@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<templates xml:space="preserve">
+
+    <t t-name="web_widget_model_viewer_16.ModelViewerField" owl="1">
+        <div class="d-inline-block position-relative">
+            <div
+                t-attf-class="position-absolute d-flex justify-content-between w-100 bottom-0 {{isMobile ? 'o_mobile_controls' : ''}}"
+                aria-atomic="true"
+                t-att-style="sizeStyle + 'z-index:9999'"
+            >
+                <t t-if="!props.readonly">
+                    <FileUploader
+                        acceptedFileExtensions="props.acceptedFileExtensions"
+                        onUploaded.bind="onFileUploaded"
+                        type="'image'"
+                    >
+                        <t t-set-slot="toggler">
+                            <button
+                                class="o_select_file_button btn btn-light border-0 rounded-circle m-1 p-1"
+                                data-tooltip="Edit"
+                                aria-label="Edit"
+                            >
+                                <i class="fa fa-pencil fa-fw" />
+                            </button>
+                        </t>
+                        <button
+                            t-if="props.value and state.isValid"
+                            class="o_clear_file_button btn btn-light border-0 rounded-circle m-1 p-1"
+                            data-tooltip="Clear"
+                            aria-label="Clear"
+                            t-on-click="onFileRemove"
+                        >
+                            <i class="fa fa-trash-o fa-fw" />
+                        </button>
+                    </FileUploader>
+                </t>
+            </div>
+            <model-viewer
+                t-ref="modelViewer"
+                t-att-src='getUrl(props.previewImage or props.name)'
+                t-att-border="props.readonly ? 0 : 1"
+                t-att-name="props.name"
+                t-att-height="props.height"
+                t-att-width="props.width"
+                t-att-style="sizeStyle"
+                alt="3D model"
+                auto-rotate="1"
+                camera-controls="1"
+            >
+                <div slot="exit-fullscreen-button">
+                    <!-- replace the default exit button -->
+                </div>
+                <div
+                    class="d-flex flex-row-reverse mt-2 mb-2 me-2"
+                    t-if="state.isValid and this.props.value"
+                >
+                    <span
+                        id="model-viewer-fullscreen"
+                        title="View fullscreen"
+                        role="img"
+                        aria-label="Fullscreen"
+                        t-on-click="fullscreen"
+                    >
+                        <t t-if="windowState.isFullscreen">
+                            <i class="fa fa-compress fa-2x" />
+                        </t>
+                        <t t-else="">
+                            <i class="fa fa-arrows-alt fa-2x" />
+                        </t>
+                    </span>
+                </div>
+            </model-viewer>
+        </div>
+    </t>
+
+</templates>

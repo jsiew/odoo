@@ -1,0 +1,90 @@
+.threedview_container {
+    background-color: #f0f0f0;
+    overflow: hidden;
+    padding-top: 10px;
+    padding-left: 10px;
+    text-align: center;
+}
+
+.item3d_info {
+    display: flex;
+    flex-direction: column;
+    border: 2px solid $o-enterprise-color;
+    border-radius: 5px;
+    padding: 10px 10px 10px 10px;
+    position: absolute;
+    z-index: 1;
+    background-color: white;
+    width: 300px;
+    text-align: left;
+    header {
+        display: flex;
+        flex-direction: row;
+        justify-content: start;
+        gap: 16px;
+        align-items: top;
+        margin-bottom: 8px;
+    }
+}
+
+.close_item3d_info_icon {
+    color: #4c4c4c;
+    cursor: pointer;
+}
+
+a {
+    color: $o-danger;
+}
+
+.loading_icon {
+    color: $o-enterprise-color;
+    position: absolute;
+    top: 0px;
+    left: 0px;
+    z-index: 10;
+    display: block;
+    text-align: center;
+    opacity: 0.7;
+}
+
+.fullscreen_icon {
+    color: $o-enterprise-color;
+    position: absolute;
+    top: 10px;
+    z-index: 10;
+    left: 16px;
+    cursor: pointer;
+}
+
+.coords_info_icon {
+    color: $o-enterprise-color;
+    position: absolute;
+    top: 10px;
+    z-index: 10;
+    left: 44px;
+    cursor: pointer;
+}
+
+.coords {
+    position: absolute;
+    left: 44px;
+    top: 10px;
+    z-index: 10;
+    background-color: gray;
+    color: white;
+    font-style: monospace;
+    font-size: 12px;
+    text-align: left;
+}
+
+.barcode_label {
+    display: none;
+    border: 1px solid $o-enterprise-color;
+    border-radius: 2px;
+    padding: 2px 2px 2px 2px;
+    position: absolute;
+    z-index: 1;
+    color: white;
+    background-color: $o-enterprise-color;
+    cursor: default;
+}

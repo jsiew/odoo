@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <record id="appointee_email_template_appointment_system_order" model="mail.template">
+            <field name="name">Appointment System: Send email to appointee</field>
+            <field name="model_id" ref="model_em_appointment_system"/>
+            <field name="email_from">{{object.user_id.email}}</field>
+            <field name="subject">{{object.name}} Appointment</field>
+            <field name="body_html" type="html">
+                <p>Hello, Sir / Madam</p>
+                <p>
+                    An appointment
+                    <b>
+                        <i>
+                            <t t-esc="object.name"/>
+                        </i>
+                    </b>
+                    with client
+                    <b>
+                        <i>
+                            <t t-esc="object.partner_id.name"/>
+                        </i>
+                    </b>
+                    is confirmed.
+                    <br/>
+                    <br/>
+                    Appointment Details:
+                    <br/>
+                    <strong>Appointment Datetime:</strong>
+                    <t t-esc="object.appointment_local_time()"/>
+                    <br/>
+                    <strong>Appointment Type:</strong>
+                    <t t-esc="object.appointment_type_id.name"/>
+                    <br/>
+
+                    <strong>Appointment Location:</strong>
+                    <t t-esc="object.location_address"/>
+                    <br/>
+
+                    <strong>Appointment Reason/Description:</strong>
+                    <t t-esc="object.reason"/>
+                    <br/>
+                </p>
+                <p>Thank you.</p>
+            </field>
+        </record>
+
+        <record id="customer_email_template_appointment_system_order" model="mail.template">
+            <field name="name">Appointment System: Send email to customer</field>
+            <field name="model_id" ref="model_em_appointment_system"/>
+            <field name="email_from">{{object.user_id.email}}</field>
+            <field name="subject">{{object.name}} Appointment</field>
+            <field name="body_html" type="html">
+                <p>Hello, Sir / Madam</p>
+                <p>
+                    Your appointment
+                    <b>
+                        <i>
+                            <t t-esc="object.name"/>
+                        </i>
+                    </b>
+                    with
+                    <b>
+                        <i>
+                            <t t-esc="object.designation_id.name"/>
+                            <t t-esc="object.user_id.name"/>
+                        </i>
+                    </b>
+                    is confirmed.
+                </p>
+                <br/>
+                <div>
+                    Appointment Details:
+                    <br/>
+                    <strong>Appointment Datetime:</strong>
+                    <t t-esc="object.appointment_local_time()"/>
+                    <br/>
+                    <strong>Appointment Type:</strong>
+                    <t t-esc="object.appointment_type_id.name"/>
+                    <br/>
+                    <strong>Appointment Location:</strong>
+                    <t t-esc="object.location_address"/>
+                    <br/>
+                    <strong>Appointment Reason/Description:</strong>
+                    <t t-esc="object.reason"/>
+                    <br/>
+                    <span>Please make sure to arrive 10 minutes before your appointment.</span>
+                    <br/>
+                    <p>Thank you.</p>
+                </div>
+            </field>
+        </record>
+
+        <record id="canceled_email_template_appointment_system_order" model="mail.template">
+            <field name="name">Appointment System: Send by cancel appointment email</field>
+            <field name="model_id" ref="model_em_appointment_system"/>
+            <field name="email_from">{{object.user_id.email}}</field>
+            <field name="subject">{{object.name}} Appointment Cancel</field>
+            <field name="body_html" type="html">
+                <p>Hello, Sir / Madam</p>
+                <p>
+                    Your appointment
+                    <b>
+                        <i>
+                            <t t-esc="object.name"/>
+                        </i>
+                    </b>
+                    with the
+                    <b>
+                        <i>
+                            <t t-esc="object.designation_id.name"/>
+                            <t t-esc="object.user_id.name"/>
+                        </i>
+                    </b>
+                    is canceled due to some reasons.
+                    <br/>
+                    Please reschedule the appointment.
+                    <br/>
+                    Sorry for the inconvenience.
+                </p>
+                <p>Thank you.</p>
+            </field>
+        </record>
+
+        <record id="product_product_appoint_fee" model="product.product">
+            <field name="name">Appointing Fee</field>
+            <field name="standard_price">0</field>
+            <field name="list_price">0</field>
+            <field name="type">service</field>
+            <field name="default_code">Appointing_Fee</field>
+            <field name="sale_ok" eval="True"/>
+            <field name="uom_id" ref="uom.product_uom_unit"/>
+            <field name="uom_po_id" ref="uom.product_uom_unit"/>
+        </record>
+    </data>
+</odoo>

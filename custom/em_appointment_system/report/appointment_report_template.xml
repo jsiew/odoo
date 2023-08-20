@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <template id="report_appointment">
+        <t t-call="web.html_container">
+            <t t-call="web.external_layout">
+                <t t-foreach="docs" t-as="doc">
+                    <div class="h2">
+                        <t t-esc="doc.name"/>
+                        <span class="" t-if="doc.canceled_by_user">(Cancel by appointee)</span>
+                    </div>
+                    <div class="row">
+                        <div class="col-6">
+                            <t t-esc="doc.user_id.name"/>
+                            <t t-if="doc.designation_id.name">(<t t-esc="doc.designation_id.name"/>)
+                            </t>
+                        </div>
+                        <div class="col-6" t-if="doc.invoice_id">
+                            <span class="font-weight-bold">Invoice Reference:</span>
+                            <t t-esc="doc.invoice_id.name"/>
+                            (<span t-field="doc.invoice_id.payment_state"/>)
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-6">
+                            <span class="font-weight-bold">Client:</span>
+                            <t t-esc="doc.partner_id.name"/>
+                        </div>
+                        <div class="col-6">
+                            <span class="font-weight-bold">Appointment Type:</span>
+                            <t t-esc="doc.appointment_type_id.name"/>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-6">
+                            <span class="font-weight-bold">Date &amp; Time:</span>
+                            <span t-field="doc.day_of_week_id"/>
+                            <t t-esc="doc.format_date()"/>
+                            <t>(<span class="font-weight-bold" t-field="doc.slot_of_time_id"/>)
+                            </t>
+                        </div>
+                        <div class="col-6">
+                            <span class="font-weight-bold">Amount:</span>
+                            <span t-field="doc.amount"
+                                  t-field-options='{"widget": "monetary", "display_currency": "doc.currency_id"}'/>
+                        </div>
+                    </div>
+                    <div class="row" t-if="doc.appointment_type_id.address_need">
+                        <div class="col-12 d-flex">
+                            <span class="font-weight-bold">Address:</span>
+                            <p class="w-75 pl-1" t-field="doc.location_address"/>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-12 d-flex">
+                            <span class="font-weight-bold">Reason:</span>
+                            <p class="w-75 pl-1" t-field="doc.reason"/>
+                        </div>
+                    </div>
+                </t>
+            </t>
+        </t>
+    </template>
+
+    <record id="action_report_appointment" model="ir.actions.report">
+        <field name="name">Appointment Report</field>
+        <field name="model">em.appointment.system</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">em_appointment_system.report_appointment</field>
+        <field name="report_file">em_appointment_system.report_appointment</field>
+        <field name="print_report_name">(object.name)</field>
+        <field name="binding_model_id" ref="model_em_appointment_system"/>
+        <field name="binding_type">report</field>
+    </record>
+
+
+</odoo>

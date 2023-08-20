@@ -1,0 +1,773 @@
+<odoo>
+    <data>
+        <record id="get_appointment_page_link" model="website.menu">
+            <field name="name">Book a Visit</field>
+            <field name="url">/appointment/new</field>
+            <field name="parent_id" ref="website.main_menu"/>
+            <field name="sequence" type="int">99</field>
+        </record>
+
+        <template id="appointment_user_calendar" name="Get Appointment">
+            <t t-call="website.layout">
+                <!--                 t-if="not user_id._is_public()"-->
+                <div class="container" id="appointment">
+                    <div class="mt-3 col-sm-12 col-md-6 text-center bg-primary text-white p-3 m-auto h2">
+                        Book a Visit
+                    </div>
+                    <style>
+
+
+                    </style>
+                    <div class="session_alert_block" t-if="session_expired">
+                        <div class="session_alert_msg  text-center p-5">
+
+                            Booking session Expired, Try again
+                            <div>
+                                <a href="/appointment/new" class="btn btn-primary mx-auto  my-3">
+                                    <i class="fa fa-plus"/>
+                                    Book Again
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                    <form t-attf-action="/appointment/new/calender" class="needs-validation"
+                          enctype="multipart/form-data"
+                          method="post" targate="_blank">
+                        <div class="form-row m-3 justify-content-between">
+
+
+                            <div class="col-md-6 mt-3 col-sm-12 form-group">
+                                <label for="desg">Resident Type</label>
+
+                                <select type="text" class="col-sm-12 form-control" id="desg"
+                                        name="desg">
+                                    <option disabled="" selected="">Resident Type</option>
+                                    <t t-foreach="designation_ids" t-as="designation_id">
+                                        <t t-if="len(designation_ids) == 1">
+                                            <option t-attf-value="{{designation_id.id}}" selected="">
+                                                <t t-esc="designation_id.name"/>
+                                            </option>
+                                        </t>
+                                        <t t-else="">
+                                            <option t-attf-value="{{designation_id.id}}">
+                                                <t t-esc="designation_id.name"/>
+                                            </option>
+                                        </t>
+                                    </t>
+                                </select>
+                            </div>
+                            <t t-if="len(user_ids) == 1">
+                                <t t-set="only_one_user" t-value="user_ids[0]"/>
+                            </t>
+                            <div class="col-md-6 mt-3 col-sm-12 form-group">
+                                <label for="user_cal">Resident</label>
+                                <select type="text" class="col-sm-12 form-control user_cal" id="user"
+                                        required="required"
+                                        name="user_cal">
+                                    <option disabled="" selected="" value="">Resident</option>
+                                    <t t-foreach="user_ids" t-as="userid">
+                                        <t t-if="len(user_ids) == 1">
+                                            <option t-attf-value="{{userid.id}}" selected="">
+                                                <t t-esc="userid.name"/>
+                                            </option>
+                                        </t>
+                                        <t t-else="">
+                                            <option t-attf-value="{{userid.id}}">
+                                                <t t-esc="userid.name"/>
+                                            </option>
+                                        </t>
+
+                                    </t>
+                                </select>
+                            </div>
+                            <div class="col-md-6 mt-3 col-sm-12 form-group">
+                                <label for="appointment_type_id">Appointment Type</label>
+                                <select type="text" class="col-sm-12 form-control" id="appointment_type_id"
+                                        required="required"
+                                        name="appointment_type_id">
+                                    <option disabled="" selected="" value="">Appointment Type</option>
+                                    <t t-if="only_one_user">
+                                        <t t-foreach="only_one_user.appointment_type_ids" t-as="appointment_type_id">
+                                            <t t-if="len(only_one_user.appointment_type_ids) == 1">
+                                                <option t-attf-value="{{appointment_type_id.id}}" selected="">
+                                                    <t t-esc="appointment_type_id.name"/>
+                                                </option>
+                                            </t>
+                                            <t t-else="">
+                                                <option t-attf-value="{{appointment_type_id.id}}">
+                                                    <t t-esc="appointment_type_id.name"/>
+                                                </option>
+                                            </t>
+                                        </t>
+                                    </t>
+                                    <t t-else="">
+                                        <t t-foreach="user_id.sudo().appointment_type_ids" t-as="appointment_type_id">
+                                            <option t-attf-value="{{appointment_type_id.id}}">
+                                                <t t-esc="appointment_type_id.name"/>
+                                            </option>
+                                        </t>
+                                    </t>
+                                </select>
+                            </div>
+                            <div class="col-sm-12 my-2 ">
+                                <button type="submit" value="submit" id="submit_user"
+                                        class="btn  d-block float-right btn-primary mt-2">Submit
+                                    <i class="fa fa-arrow-circle-right"/>
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+
+                </div>
+                <!--                <div class="container" id="appointment" t-else="">-->
+                <!--                    <div class=" col-sm-12 col-md-6 text-center bg-primary text-white p-3 h2"-->
+                <!--                         style="    margin: 42px auto !important;    display: flex;flex-direction: column;">-->
+                <!--                        <div>-->
+                <!--                            Please login to get an appointment...-->
+                <!--                        </div>-->
+                <!--                        <div>-->
+                <!--                            <a href="/web/login?redirect=/appointment/new"-->
+                <!--                               class="btn  btn-light text-primary mt-2"-->
+                <!--                            >Login-->
+                <!--                            </a>-->
+                <!--                        </div>-->
+
+                <!--                    </div>-->
+                <!--                </div>-->
+            </t>
+        </template>
+
+
+        <template id="appointment_calendar" name="Book Visit">
+            <t t-call="website.layout">
+                <div class="container mt-4" id="appointment">
+                    <div class="mt-3 cocol-sm-12 col-md-6 text-center bg-primary text-white p-3 m-auto  h2">
+                        Book a Visit
+                    </div>
+
+                    <a href="/appointment/new" t-if="go_back" class="btn btn-primary p-0 px-2  my-2">
+                        <i class="fa fa-arrow-circle-left"/>
+                        Back
+                    </a>
+
+                    <input type="hidden" class="" id="re_sch_invoice_id" name="re_sch_invoice_id"
+                           t-att-value="invoice_id"/>
+
+                    <t t-set="is_slot" t-value="False"/>
+                    <div class="row">
+                        <div t-foreach="slots" t-as="month"
+                             t-attf-class="col-lg-6 app_calendar {{'d-none' if month['start'].date()!=month['today_date'].date() else ''}}">
+                            <h3 t-esc="month['month']"/>
+                            <span class="prev_month fa fa-arrow-left"/>
+                            <span class="next_month float-right fa fa-arrow-right "/>
+                            <table class="table">
+                                <tr class="active">
+                                    <th class="text-center">Mon</th>
+                                    <th class="text-center">Tue</th>
+                                    <th class="text-center">Wed</th>
+                                    <th class="text-center">Thu</th>
+                                    <th class="text-center">Fri</th>
+                                    <th class="text-center">Sat</th>
+                                    <th class="text-center">Sun</th>
+                                </tr>
+                                <tr t-foreach="month['weeks']" t-as="weeks" class="o_calendar_days">
+                                    <t t-foreach="weeks" t-as="day">
+                                        <td t-attf-class="text-center#{(day['slots'] if day['day']>= today_date.date() else '') and ' o_day dropdown' or ''} #{day['weekend_cls']} #{day['today_cls']}"
+                                            t-attf-title="#{day['today_cls'] and 'Today' or ''}"
+                                            t-att-data-date="day['day'] if day['day']>= today_date.date() else ''"
+                                            t-att-data-user_id="userid if day['day']>= today_date.date() else ''"
+                                            t-att-data-appointment_type_id="appointment_type_id.id">
+                                            <t t-if="day['slots'] and day['day']&gt;= today_date.date()">
+                                                <div class=" o_slots_dropdown">
+                                                    <strong>
+                                                        <span t-att-data-date="day['day']">
+                                                            <t t-esc="day['day'].day"/>
+                                                        </span>
+                                                    </strong>
+                                                    <t t-set="is_slot" t-value="True"/>
+                                                </div>
+                                            </t>
+                                            <t t-if="day['slots'] and day['day']&lt; today_date.date()">
+                                                <div t-esc="day['day'].day" t-att-class="day['mute_cls']"/>
+                                            </t>
+                                            <t t-if="not day['slots']">
+                                                <div t-esc="day['day'].day" t-att-class="day['mute_cls']"/>
+                                            </t>
+                                        </td>
+                                    </t>
+                                </tr>
+                                <tr t-if="len(month['weeks']) == 5" class="o_calendar_days"/>
+                            </table>
+                        </div>
+                        <div class="col-lg-6 p-2">
+                            <div id="view_slots_title" class="h2 text-center p-2">
+                            </div>
+
+                            <div id="view_slots" class="row">
+                                <div class="h2 text-center w-100 alert alert-warning" t-if="not is_slot">Appointment
+                                    Slots not available for the selected resident!
+                                </div>
+                                <div class="h3 text-center w-100 alert alert-info" t-else="">Click on the highlighted
+                                    dates to view the available time slots
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </t>
+        </template>
+
+        <template id="website_appointment_system" name="Get Appointment">
+            <t t-call="website.layout">
+                <div>
+                    <div id="appointment" class="container">
+                        <div class="mt-3 col-sm-12 col-md-6 text-center bg-primary text-white p-3 m-auto  h2">
+                            Book a Visit
+                        </div>
+                        <div class="d-block"
+                             style="position: relative;top:15px;left: 17px;margin: auto;">
+                            <a t-attf-href="/appointment/new/calender?user_cal={{userid.id}}&amp;appointment_type_id={{appointment_type_id.id}}"
+                               class="btn btn-primary p-0 px-2 mb-2">
+                                <i class="fa fa-arrow-circle-left "/>
+                                Back
+                            </a>
+                        </div>
+
+                        <form t-attf-action="/confirm_appointment" class="needs-validation"
+                              enctype="multipart/form-data"
+                              method="post" targate="_blank">
+
+                            <div class="form-row m-3 justify-content-between">
+                                <input type="hidden" class="" id="re_sch_invoice_id" name="re_sch_invoice_id"
+                                       t-att-value="re_sch_invoice_id"/>
+                                <input type="hidden" class="" id="partner_id" name="partner_id"
+                                       t-att-value="uid"/>
+                                <div class="col-md-6 mt-3 col-sm-12 ">
+                                    <input type="hidden" class="w-100" id="desg" name="desg"
+                                           t-att-value="userid.designation_id.id"/>
+                                    <label for="desg">Resident Type</label>
+                                    <div class="form-control">
+                                        <span t-esc="userid.designation_id.name"/>
+                                    </div>
+                                </div>
+                                <div class="col-md-6 mt-3 col-sm-12 ">
+                                    <input type="hidden" class="w-100" id="user" name="user"
+                                           t-att-value="userid.id"/>
+                                    <label for="user">Resident</label>
+                                    <div class="form-control">
+                                        <span t-esc="userid.name"/>
+                                    </div>
+                                </div>
+                                <div class="col-md-6 mt-3 col-sm-12 ">
+                                    <input type="hidden" class="w-100" id="date_app" name="date_app"
+                                           t-att-value="date.date()"/>
+                                    <label for="date_app">Datetime</label>
+
+                                    <div class="form-control">
+                                        <span t-esc="date"/>
+                                    </div>
+                                </div>
+                                <div class="col-md-6 mt-3 col-sm-12 ">
+                                    <input type="hidden" class="w-100" id="slot_time" name="slot_time"
+                                           t-att-value="slot_of_time_id.id"/>
+                                    <label for="slot_time">Time Slot</label>
+                                    <div class="form-control">
+                                        <span t-esc="slot_of_time_id.display_name"/>
+                                    </div>
+                                </div>
+                                <div class="col-md-6 mt-3 col-sm-12 ">
+                                    <label for="reason">Remarks</label>
+                                    <textarea type="text" class="col-sm-12 form-control" id="reason" name="reason"
+                                              t-att-style="'height: 134px;' if appointment_type_id.address_need else 'height: 62px;'"
+                                              
+                                              placeholder="Remarks"/>
+                                </div>
+                                <div class="col-md-6 mt-3 col-sm-12 ">
+                                    <input type="hidden" class="w-100" id="appointment_type_id"
+                                           name="appointment_type_id"
+                                           t-att-value="appointment_type_id.id"/>
+                                    <label for="appointment_type_id">Description</label>
+
+                                    <div class="col-sm-12 form-control " style="height: auto;"
+                                         id="additional_info">
+                                        <!-- <div id="amount_box" class="font-weight-bold">Amount:
+                                            <span id="amount_text" class="font-weight-normal" t-field="userid.amount"/>
+                                        </div>
+ -->
+                                        <div id="address_box" class="font-weight-bold">Appointment type:
+                                            <span id="address_text" class="font-weight-normal d-inline-flex"
+                                                  t-field="appointment_type_id.name"/>
+                                        </div>
+                                        <div id="address_box" t-if="appointment_type_id.address_need"
+                                             class="font-weight-bold">Location Address:
+                                            <span id="address_text" class="font-weight-normal d-inline-flex"
+                                                  t-field="userid.location_address"/>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6 mt-3 col-sm-12 d-none">
+                                    <input type="checkbox" class=" " style="" id="client_name_bool"/>
+                                    <label for="client_name_bool" class="  font-weight-normal m-0">Getting appointment
+                                        for
+                                        someone else
+                                    </label>
+                                </div>
+                                <div class="col-md-6 my-3 col-sm-12 ">
+                                    <input type="text" class="col-sm-12 d-none form-control" id="client_name"
+                                           name="client_name"
+                                           placeholder="Client Name"/>
+                                </div>
+                                <div class="col-sm-12 ">
+                                    <button t-if="not user_id._is_public()"
+                                            type="submit" value="submit" class="btn btn-primary ">Submit
+                                    </button>
+                                    <h2 t-else="" class="o_page_header mt8">Your Address
+                                        <small>or</small>
+                                        <a role="button" t-attf-href="{{redirect_link}}" class='btn btn-primary'
+                                           style="margin-top: -11px">Log In
+                                        </a>
+                                    </h2>
+                                    <!--                                    <a  t-attf-href="{{redirect_link}}"-->
+                                    <!--                                       class="btn  btn-light text-primary mt-2"-->
+                                    <!--                                    >Login-->
+                                    <!--                                    </a>-->
+                                </div>
+                            </div>
+                            <t t-if="user_id._is_public()" t-call="website_appointment_system.guest_customer_details"/>
+                            <div class="col-sm-12 mb16" t-if="user_id._is_public()">
+                                <button
+                                        type="submit" value="submit" class="btn btn-primary ">Submit
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </t>
+        </template>
+
+        <template id="website_appointment_system_pay_invoice" name="Pay Appointment">
+            <t t-call="website.layout">
+                <div class="container">
+                    <div>
+                        <a t-att-href="back_url" class="btn btn-primary p-0 px-2  my-2">
+                            <i class="fa fa-arrow-circle-left"/>
+                            Back
+                        </a>
+
+                    </div>
+                    <div t-if="providers or tokens" id="payment_method" class="text-left col-md-13">
+                        <t t-call="payment.checkout">
+                            <t t-set="mode" t-value="'payment'"/>
+                            <t t-set="partner_id"
+                               t-value="invoice.partner_id.id if request.env.user._is_public() else request.env.user.partner_id.id"/>
+                            <t t-set="landing_route"
+                               t-value="success_url"/>
+                            <t t-set="access_token" t-value="access_token or ''"/>
+                            <t t-set="callback_method" t-value="''"/>
+                            <t t-set="form_action"
+                               t-value="'/invoice/pay/' + str(invoice.id) + '/s2s_token_tx/'"/>
+                            <t t-set="prepare_tx_url"
+                               t-value="'/invoice/pay/' + str(invoice.id) + '/form_tx/'"/>
+                            <t t-set="submit_txt">Pay Now</t>
+                            <t t-set="icon_class" t-value="'fa-lock'"/>
+                        </t>
+
+                    </div>
+                </div>
+
+            </t>
+        </template>
+
+        <template id="website_appointment_system_feedback" name="Get Appointment">
+            <t t-call="website.layout">
+                <div id="appointment" class="container">
+                    <div t-if="appointment_id"
+                         class="mt-3 col-sm-12 text-center bg-primary text-white p-3 m-auto w-75 h2">
+                        <div>Visit Booking Request Submitted</div>
+                        <div>Your visit booking request ID is
+                            <t t-esc="appointment_id.name"/>.
+                        </div>
+                        <span class="" style="position: relative;top: 13px;">
+                            <a t-attf-href="/print_report/{{appointment_id.id}}/0?access_token={{appointment_id.access_token}}"
+                               class="btn btn-light text-primary  mb-2" target="new">
+                                <i class="fa fa-print"/>
+                                Print
+                            </a>
+                            <a href="/appointment/new" class="btn btn-light text-primary   mb-2">
+                                <i class="fa fa-plus"/>
+                                New
+                            </a>
+                            <a t-att-href="appointment_id.get_portal_url()"
+                               class="btn btn-light text-primary  mb-2">
+                                <i class="fa fa-money"/>
+                                View
+                            </a>
+                        </span>
+                    </div>
+                    <div t-else="" class="mt-3 col-sm-12 text-center bg-primary text-white p-3 m-auto w-75 h2">
+                        <div>You missed some fields to confirm an Appointment successfully..</div>
+                    </div>
+                </div>
+            </t>
+        </template>
+
+        <template id="portal_my_home_appointment" name="Portal My Home : vehicle Booking"
+                  inherit_id="portal.portal_my_home">
+            <xpath expr="//div[hasclass('o_portal_docs')]" position="inside">
+                <t t-call="portal.portal_docs_entry">
+                    <t t-set="title">Appointment</t>
+                    <t t-set="url" t-value="'/my/appointment'"/>
+                    <t t-set="placeholder_count" t-value="'booking_count'"/>
+                </t>
+            </xpath>
+        </template>
+
+        <template id="portal_my_home_menu_appointment" name="Portal layout : Appointment"
+                  inherit_id="portal.portal_breadcrumbs" priority="30">
+            <xpath expr="//ol[hasclass('o_portal_submenu')]" position="inside">
+                <li t-if="page_name == 'Appointment'"
+                    t-attf-class="breadcrumb-item #{'active ' if not appointment_id else ''}">
+                    <a t-attf-href="/my/appointment?{{ keep_query()}}">Appointment</a>
+                </li>
+                <li t-if="appointment_id" class="breadcrumb-item active">
+                    <t t-esc="appointment_id.name"/>
+                </li>
+            </xpath>
+        </template>
+
+
+        <template id="portal_my_appointment" name="My Appointment">
+            <t t-call="portal.portal_layout">
+                <t t-set="breadcrumbs_searchbar" t-value="True"/>
+                <t t-call="portal.portal_searchbar">
+                    <t t-set="title">Appointment</t>
+                </t>
+                <t t-call="portal.portal_table">
+                    <thead>
+                        <tr class="active">
+                            <th>Sequence</th>
+                            <th>Resident</th>
+                            <th>State</th>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+                        <t t-foreach="appointment_ids" t-as="appointment_id">
+                            <tr class="active">
+                                <td>
+                                    <a t-attf-href="/my/appointment/{{appointment_id.id}}"
+                                       t-att-title="appointment_id.name">
+                                        <t t-esc="appointment_id.name"/>
+                                    </a>
+                                </td>
+                                <td>
+                                    <t t-esc="appointment_id.user_id.name"/>
+                                </td>
+                                <td>
+                                    <span t-field="appointment_id.state"/>
+                                </td>
+                            </tr>
+                        </t>
+                    </tbody>
+                </t>
+            </t>
+        </template>
+
+
+        <template id="portal_appoint_page" name="Appointment Page" inherit_id="portal.portal_sidebar" primary="True">
+            <xpath expr="//div[hasclass('o_portal_sidebar')]" position="inside">
+                <div class="row mt16">
+                    <!-- Sidebar -->
+                    <t t-call="portal.portal_record_sidebar">
+                        <t t-set="classes" t-value="'col-lg-auto d-print-none'"/>
+                        <t t-set="tx_ids"
+                           t-value="appointment_id.invoice_id.transaction_ids.filtered(lambda tx: tx.state in ('pending', 'authorized', 'done'))"/>
+                        <t t-set="pending_manual_txs"
+                           t-value="tx_ids.filtered(lambda tx: tx.state == 'pending' and tx.acquirer_id.provider in ('transfer', 'manual'))"/>
+                        <t t-set="title">
+                            <h2 class="mb-0">
+                                <b t-field="appointment_id.amount"
+                                   t-field-options='{"widget": "monetary", "display_currency": "appointment_id.currency_id"}'/>
+                            </h2>
+                        </t>
+
+                        <t t-set="entries">
+                            <ul class="list-group list-group-flush flex-wrap flex-row flex-lg-column">
+                                <li class="list-group-item flex-grow-1">
+                                    <div>
+                                        <a t-attf-href="/appointment_pay/{{appointment_id.id}}"
+                                           t-if="appointment_id.invoice_id.state == 'posted' and appointment_id.invoice_id.payment_state in ('not_paid', 'partial') and appointment_id.invoice_id.amount_total and appointment_id.invoice_id.move_type == 'out_invoice' and (pending_manual_txs or not tx_ids)"
+
+                                           class="btn btn-primary btn-block mb-2">
+                                            <i class="fa fa-fw fa-arrow-circle-right"/>
+                                            Pay Now
+                                        </a>
+                                        <div t-if="tx_ids and not pending_manual_txs and appointment_id.invoice_id.payment_state != 'paid'"
+                                             class="alert alert-info py-1 mb-2">
+                                            <i class="fa fa-fw fa-check-circle"/>
+                                            Pending
+                                        </div>
+                                        <div t-if="appointment_id.invoice_id.payment_state == 'paid'"
+                                             class="alert alert-success py-1 mb-2">
+                                            <i class="fa fa-fw fa-check-circle"/>
+                                            Paid
+                                        </div>
+                                    </div>
+                                    <div class="o_download_pdf btn-toolbar flex-sm-nowrap">
+                                        <div class="btn-group  flex-grow-1 mr-1 mb-1">
+                                            <a t-attf-href="/print_report/{{appointment_id.id}}/1?access_token={{appointment_id.access_token}}"
+                                               class="btn btn-secondary mb-2">
+                                                <i class="fa fa-download"/>
+                                                Download
+                                            </a>
+                                        </div>
+                                        <div class="btn-group flex-grow-1 mb-1">
+                                            <a t-attf-href="/print_report/{{appointment_id.id}}/0?access_token={{appointment_id.access_token}}"
+                                               target="new"
+                                               class="btn btn-secondary  mb-2">
+                                                <i class="fa fa-print"/>
+                                                Print
+                                            </a>
+                                        </div>
+                                    </div>
+                                </li>
+                            </ul>
+                        </t>
+                    </t>
+
+                    <!-- Page Content -->
+                    <div id="appointment_content" class="col-12 col-lg">
+                        <div class="o_portal_html_view shadow p-3">
+                            <div width="100%" height="100%">
+                                <div class="card">
+                                    <div class=" card-header">
+                                        <span class="h2" t-esc="appointment_id.name"/>
+                                        <span class="" t-if="appointment_id.canceled_by_user">(Cancelled by Resident)
+                                        </span>
+                                        <span class="float-right font-weight-bold">
+                                            <span t-field="appointment_id.state"/>
+                                            (<span class="" t-field="appointment_id.invoice_id.payment_state"/>)
+                                        </span>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="row  py-1">
+                                            <div class="col-6">
+                                                <span class="font-weight-bold">Resident:</span>
+                                                <t t-esc="appointment_id.user_id.name"/>
+                                                <t t-if="appointment_id.designation_id.name">(<t
+                                                        t-esc="appointment_id.designation_id.name"/>)
+                                                </t>
+                                            </div>
+                                            <div class="col-6" t-if="appointment_id.invoice_id">
+                                                <span class="font-weight-bold">Invoice Reference:</span>
+                                                <t t-esc="appointment_id.invoice_id.name"/>
+                                                (<span t-field="appointment_id.invoice_id.payment_state"/>)
+
+                                            </div>
+                                        </div>
+                                        <div class="row  py-1">
+                                            <div class="col-6">
+                                                <span class="font-weight-bold">Client:</span>
+                                                <t t-esc="appointment_id.partner_id.name"/>
+
+                                            </div>
+                                            <div class="col-6">
+                                                <span class="font-weight-bold">Appointment Type:</span>
+                                                <t t-esc="appointment_id.appointment_type_id.name"/>
+                                            </div>
+                                        </div>
+                                        <div class="row py-1">
+                                            <div class="col-6">
+                                                <span class="font-weight-bold">Date &amp; Time:</span>
+                                                <span t-field="appointment_id.day_of_week_id"/>
+                                                <t t-esc="appointment_id.format_date()"/>
+                                                <t t-if="appointment_id.slot_of_time_id">(
+                                                    <span class="font-weight-bold"
+                                                          t-field="appointment_id.slot_of_time_id"/>
+                                                    )
+                                                </t>
+                                            </div>
+                                            <div class="col-6">
+                                                <span class="font-weight-bold">Amount:</span>
+                                                <span t-field="appointment_id.amount"
+                                                      t-field-options='{"widget": "monetary", "display_currency": "appointment_id.currency_id"}'/>
+                                            </div>
+                                        </div>
+
+                                        <div class="row py-1" t-if="appointment_id.show_address">
+                                            <div class="col-12 d-flex">
+                                                <span class="font-weight-bold">Address:</span>
+                                                <p class="w-75 pl-1" t-field="appointment_id.location_address"/>
+                                            </div>
+                                        </div>
+                                        <div class="row py-1">
+                                            <div class="col-12 d-flex">
+                                                <span class="font-weight-bold">Reason:</span>
+                                                <p class="w-75 pl-1" t-field="appointment_id.reason"/>
+                                            </div>
+                                        </div>
+                                        <a t-if="appointment_id.state not in ['cancel','expire','close']"
+                                           t-attf-href="/appointment_cancel/{{appointment_id.id}}?access_token={{appointment_id.access_token}}"
+                                           class="btn btn-danger float-right mb-2">Cancel
+                                        </a>
+                                        <a t-if="appointment_id.state in ['cancel'] and appointment_id.canceled_by_user"
+                                           t-attf-href="/appointment/new/calender?user_cal={{appointment_id.user_id.id}}&amp;appointment_type_id={{appointment_id.appointment_type_id.id}}{{'&amp;invoice_id='+str(appointment_id.invoice_id.id) if appointment_id.invoice_id.payment_state=='paid' else ''}}"
+                                           class="btn btn-primary float-right mb-2">Re-Schedule
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- chatter -->
+                        <div id="invoice_communication" class="mt-4">
+                            <h2>History</h2>
+                            <t t-call="portal.message_thread">
+                                <t t-set="object" t-value="appointment_id"/>
+                            </t>
+                        </div>
+                    </div>
+                </div>
+            </xpath>
+        </template>
+
+
+        <template id="guest_customer_details">
+            <div class="p-md-3 p-2">
+                <div class="form-row">
+                    <div class="form-group col-md-6">
+                        <label for="customer_name">Name</label>
+                        <input type="text" class="form-control" id="customer_name"
+                               name="customer_name" required="" t-att-value="customer_name"/>
+                    </div>
+
+                    <div class="form-group col-md-6">
+                        <label for="customer_phone">Phone</label>
+                        <input type="tel" id="customer_phone" name="customer_phone" class="form-control"
+                               required="" t-att-value="customer_phone"/>
+                    </div>
+
+                    <div class="form-group col-md-6">
+                        <label for="customer_email">Email</label>
+                        <input type="email" id="customer_email" name="customer_email"
+                               class="form-control" required="" t-att-value="customer_email"/>
+                    </div>
+
+                    <!--                    <div class="form-group col-md-6">-->
+                    <!--                        <label for="pref_contact_method">How would you like to be contacted?</label>-->
+                    <!--                        <br/>-->
+                    <!--                        <t t-if="pref_contact_method == 'phone'">-->
+                    <!--                            <div class="custom-control custom-radio custom-control-inline">-->
+                    <!--                                <input class="custom-control-input" type="radio"-->
+                    <!--                                       name="pref_contact_method"-->
+                    <!--                                       id="method_email" value="email"/>-->
+                    <!--                                <label class="custom-control-label" for="method_email">-->
+                    <!--                                    Email-->
+                    <!--                                </label>-->
+                    <!--                            </div>-->
+                    <!--                            <div class="custom-control custom-radio custom-control-inline">-->
+                    <!--                                <input class="custom-control-input" type="radio"-->
+                    <!--                                       name="pref_contact_method" checked=""-->
+                    <!--                                       id="method_phone" value="phone"/>-->
+                    <!--                                <label class="custom-control-label" for="method_phone">-->
+                    <!--                                    Phone-->
+                    <!--                                </label>-->
+                    <!--                            </div>-->
+                    <!--                        </t>-->
+
+                    <!--                        <t t-else="">-->
+                    <!--                            <div class="custom-control custom-radio custom-control-inline">-->
+                    <!--                                <input class="custom-control-input" type="radio"-->
+                    <!--                                       name="pref_contact_method"-->
+                    <!--                                       id="method_email" value="email" checked=""/>-->
+                    <!--                                <label class="custom-control-label" for="method_email">-->
+                    <!--                                    Email-->
+                    <!--                                </label>-->
+                    <!--                            </div>-->
+                    <!--                            <div class="custom-control custom-radio custom-control-inline">-->
+                    <!--                                <input class="custom-control-input" type="radio"-->
+                    <!--                                       name="pref_contact_method"-->
+                    <!--                                       id="method_phone" value="phone"/>-->
+                    <!--                                <label class="custom-control-label" for="method_phone">-->
+                    <!--                                    Phone-->
+                    <!--                                </label>-->
+                    <!--                            </div>-->
+                    <!--                        </t>-->
+                    <!--                    </div>-->
+                </div>
+
+                <div class="form-group">
+                    <label for="customer_address_one">Address</label>
+                    <input type="text" class="form-control" id="customer_address_one"
+                           name="customer_address_one" required="" t-att-value="customer_address_one"
+                           placeholder="1234 Main St"/>
+                </div>
+
+                <div class="form-group">
+                    <label for="customer_address_two">Address 2</label>
+                    <input type="text" class="form-control" id="customer_address_two"
+                           name="customer_address_two" t-att-value="customer_address_two"
+                           placeholder="Apartment, studio, or floor"/>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group col-md-6">
+                        <label for="customer_address_city">City</label>
+                        <input type="text" class="form-control" id="customer_address_city"
+                               name="customer_address_city" required=""
+                               t-att-value="customer_address_city"/>
+                    </div>
+
+                    <div class="form-group col-md-4">
+                        <label for="customer_address_state">State</label>
+                        <select id="customer_address_state" class="form-control custom-select"
+                                name="customer_address_state">
+                            <option selected=""/>
+                            <t t-foreach="website.company_id.country_id.state_ids" t-as="state_id">
+                                <t t-if="customer_address_state and (state_id.id == int(customer_address_state))">
+                                    <option t-att-value="state_id.id" selected="">
+                                        <t t-esc="state_id.name"/>
+                                    </option>
+                                </t>
+                                <t t-else="">
+                                    <option t-att-value="state_id.id">
+                                        <t t-esc="state_id.name"/>
+                                    </option>
+                                </t>
+                            </t>
+                        </select>
+                    </div>
+
+                    <div class="form-group col-md-2">
+                        <label for="customer_address_zip">Zip</label>
+                        <input type="text" class="form-control" id="customer_address_zip"
+                               name="customer_address_zip" required=""
+                               t-att-value="customer_address_zip"/>
+                    </div>
+
+                    <!--                    <div class="form-group col-md-6">-->
+                    <!--                        <div class="custom-control custom-checkbox">-->
+                    <!--                            <input class="custom-control-input" type="checkbox" id="newsletter_agree"-->
+                    <!--                                   name="newsletter_agree" checked=""/>-->
+                    <!--                            <label class="custom-control-label label-optional" for="newsletter_agree">-->
+                    <!--                                I agree to receive occasional promotion, newsletter, safety and recall-->
+                    <!--                                communications from-->
+                    <!--                                <t t-esc="website.company_id.name"/>-->
+                    <!--                                .-->
+                    <!--                                <br/>-->
+                    <!--                                Consent can be withdrawn at any time.-->
+                    <!--                            </label>-->
+                    <!--                        </div>-->
+                    <!--                    </div>-->
+                    <!--                    <div class="col-md-6">-->
+                    <!--                        <button type="submit" class="btn btn-primary w-100 h-100"-->
+                    <!--                                id="submit_service_form">-->
+                    <!--                            <i class="fa fa-calendar"/>-->
+                    <!--                            Book Service-->
+                    <!--                        </button>-->
+                    <!--                    </div>-->
+                </div>
+            </div>
+
+        </template>
+    </data>
+</odoo>

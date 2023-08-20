@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<templates xml:space="preserve">
+
+    <t t-name="web_threed.ThreedRenderer" owl="1">
+        <div class="threedview" t-ref="root">
+            <span
+                class="fa fa-refresh fa-spin fa-2x loading_icon"
+                aria-hidden="false"
+                title="Loading..."
+                t-if="state.isLoading"
+                t-ref="loading-icon"
+                t-attf-style="left: {{loadingIconAbsolutePosition.left}}px; top:{{loadingIconAbsolutePosition.top}}px"
+            />
+            <span
+                class="fa fa-arrows-alt fa-2x fullscreen_icon"
+                aria-hidden="false"
+                title="Fullscreen"
+                t-on-click="toggleFullscreen"
+            />
+            <span
+                class="fa fa-map-marker fa-2x coords_info_icon"
+                aria-hidden="false"
+                title="Coords"
+                t-if="!coordinatesDisplay.visible"
+                t-on-click.prevent="showCoordinates"
+            />
+            <div
+                class="coords"
+                t-if="coordinatesDisplay.visible"
+                t-on-click.prevent="hideCoordinates"
+            >
+                <t t-out="coordinatesDisplay.text" />
+            </div>
+            <div class="barcode_label" t-ref="barcode-label" />
+            <div
+                id="dialog"
+                title="Configuration error"
+                t-if="!props.selectedGroundAreaId"
+            >
+                <t t-if="props.noAreaLoaded">
+                    <div t-esc="props.noAreaLoaded" />
+                </t>
+                <t t-else="">
+                    <div
+                    >No area have been loaded. Please check whether the area have a planimetry image and the dimensions correctly set.</div>
+                </t>
+            </div>
+            <div
+                class="item3d_info"
+                data-current="0"
+                t-if="itemInfoPopup.state.visible == true"
+                t-ref="item3d-popup"
+                t-portal="'.threed-layout'"
+            >
+                <span
+                    class="fa fa-times close_item3d_info_icon"
+                    aria-hidden="false"
+                    title="Close"
+                    t-on-click="closeItemInfoPopup"
+                />
+                <t t-call="{{ props.templates['threedview-popup-info'] }}" />
+            </div>
+            <div
+                class="threedview_container"
+                t-ref="scene-container"
+                t-on-dblclick="onContainerDoubleClick"
+                t-on-mousemove="onContainerMouseMove"
+            />
+        </div>
+    </t>
+
+</templates>

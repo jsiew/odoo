@@ -1,0 +1,163 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<odoo>
+
+    <record id="view_location_threed_threed" model="ir.ui.view">
+        <field name="name">stock.location.threed</field>
+        <field name="model">stock.location</field>
+        <field name="type">threed</field>
+        <!-- <field name="auto_refresh" eval="5"></field> -->
+        <field name="arch" type="xml">
+            <threed
+                name="3d View"
+                no_area_loaded="No areas have been loaded. Please check whether the areas have a planimetry image and the dimensions correctly set."
+                no_item="No product."
+                auto_refresh="60"
+            >
+                <camera x="" y="" z="" fov="50" />
+                <scene>
+                    <ground>
+                        <field name="warehouse_id">
+                            <planimetry
+                                name_field="name"
+                                image_field="planimetry_image"
+                                sizex_field="spacex"
+                                sizey_field="spacey"
+                                sizez_field="spacez"
+                            >
+                            </planimetry>
+                        </field>
+                    </ground>
+                    <objects>
+                        <field name="posx" type="position" axis="x" />
+                        <field name="posy" type="position" axis="y" />
+                        <field name="posz" type="position" axis="z" />
+                        <field name="sizex" type="size" axis="x" />
+                        <field name="sizey" type="size" axis="y" />
+                        <field name="sizez" type="size" axis="z" />
+                        <field name="scale_factor" type="scale_factor" />
+                        <field name="rotx" type="rotation" axis="x" />
+                        <field name="roty" type="rotation" axis="y" />
+                        <field name="rotz" type="rotation" axis="z" />
+                        <field name="gltf_3d_model" type="gltf" />
+                        <field name="shape_file" type="geometry" />
+                        <field name="color" type="color" />
+                        <field name="opacity" type="opacity" />
+                        <field name="barcode" type="name" />
+                        <field name="usage" />
+                        <field name="warehouse_id" />
+                    </objects>
+                </scene>
+                <legend
+                    comodel_name="stock.location.tag"
+                    name_field="name"
+                    color_field="color_hex"
+                    opacity_field="opacity"
+                />
+                <templates>
+                    <!-- Here we have access to "record" containing the result of the server_action -->
+                    <t
+                        t-name="threedview-popup-info"
+                        server_action="get_3d_view_item_info"
+                    >
+                        <header>
+                            <span class="item3d_data" t-esc="record.barcode" />
+                        </header>
+                        <t
+                            t-if="!record.stock_quants || record.stock_quants.length == 0"
+                        >
+                            <p>No product is stored here at the moment.</p>
+                        </t>
+                        <t t-else="">
+                            <ul style="padding-left: 16px;">
+                                <t t-foreach="record.stock_quants" t-as="stock_quant">
+                                    <li>
+                                        <t
+                                            t-if="stock_quant.product_code or stock_quant.product_lot"
+                                        >
+                                            <t t-if="stock_quant.product_code">
+                                                <t t-esc="stock_quant.product_code" />
+                                            </t>
+                                            <t t-if="stock_quant.booking_num != ''">
+                                                <br />
+                                                Bkg/BL No.: <t t-esc="stock_quant.booking_num"/>
+                                            </t>
+                                            <t t-if="stock_quant.container_num != ''">
+                                                <br />
+                                                Container: <t t-esc="stock_quant.container_num"/>
+                                            </t>
+                                            <t t-if="stock_quant.product_lot">
+                                                <br />
+                                                Pallet: <t t-esc="stock_quant.product_lot"/>
+                                            </t>
+                                            <!-- : -->
+                                        </t>
+                                        <!-- <t t-esc="stock_quant.product_name" /> (<t
+                                            t-esc="stock_quant.product_qty"
+                                        />) -->
+                                    </li>
+                                </t>
+                            </ul>
+                        </t>
+                    </t>
+                </templates>
+            </threed>
+        </field>
+    </record>
+
+    <record id="view_location_form_threed" model="ir.ui.view">
+        <field name="inherit_id" ref="stock.view_location_form" />
+        <field name="model">stock.location</field>
+        <field name="arch" type="xml">
+            <xpath expr="//sheet" position="before">
+                <header>
+                    <button
+                        string="3D View"
+                        name="threedView"
+                        type="object"
+                        class="oe_stat_button"
+                        icon="fa-cubes"
+                    />
+                </header>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="view_location_tree_threed" model="ir.ui.view">
+        <field name="inherit_id" ref="stock_3dbase.view_location_tree2_wh" />
+        <field name="model">stock.location</field>
+        <field name="arch" type="xml">
+            <field name="usage" position="after">
+                <field name="scrap_location" optional="hide" />
+                <field name="return_location" optional="hide" />
+            </field>
+        </field>
+    </record>
+
+    <record id="view_location_pivot_threed" model="ir.ui.view">
+        <field name="name">view.location.pivot.threed</field>
+        <field name="model">stock.location</field>
+        <field name="arch" type="xml">
+            <pivot string="Location">
+                <field name="create_date" type="row" interval="month" />
+                <field name="cyclic_inventory_frequency" type="measure" />
+            </pivot>
+        </field>
+    </record>
+
+    <record
+        id="stock_3dbase.act_warehouse_stock_locations"
+        model="ir.actions.act_window"
+    >
+        <field name="view_mode">tree,form,pivot,threed</field>
+        <field
+            name="view_ids"
+            eval="[(5, 0, 0),
+                      (0, 0, {'view_mode': 'tree', 'view_id': ref('view_location_tree_threed')}),
+                      (0, 0, {'view_mode': 'form', 'view_id': ref('view_location_form_threed')}),
+                      (0, 0, {'view_mode': 'pivot', 'view_id': ref('view_location_pivot_threed')}),
+                      (0, 0, {'view_mode': 'threed', 'view_id': ref('view_location_threed_threed')})]"
+        />
+        <field name="search_view_id" ref="stock_3dbase.view_location_search_wh" />
+    </record>
+
+</odoo>

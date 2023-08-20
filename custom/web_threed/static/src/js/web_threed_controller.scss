@@ -1,0 +1,122 @@
+#info {
+    color: #00ffff;
+    position: absolute;
+    top: 0px;
+    width: 100%;
+    padding: 5px;
+}
+
+#reload_icon.clickable {
+    cursor: pointer;
+}
+
+.refresh_countdown {
+    color: $o-enterprise-color;
+    position: absolute;
+    top: 10px;
+    z-index: 10;
+    right: 36px;
+    cursor: pointer;
+    text-align: right;
+    font-weight: bold;
+    font-size: 20px;
+}
+
+.legend_icon {
+    color: $o-enterprise-color;
+    position: absolute;
+    top: 10px;
+    z-index: 10;
+    right: 10px;
+    cursor: pointer;
+}
+
+#toggle_arrowkeys_meaning_icon {
+    color: $o-enterprise-color;
+    position: absolute;
+    top: 10px;
+    z-index: 10;
+    right: 16px;
+    cursor: pointer;
+}
+
+.legend {
+    border: 2px solid $o-enterprise-color;
+    border-radius: 5px;
+    padding: 10px 10px 10px 10px;
+    position: absolute;
+    z-index: 10;
+    background-color: white;
+    width: 200px;
+    text-align: left;
+    top: 40px;
+    right: 16px;
+}
+
+.legend_ul {
+    list-style-type: none;
+    padding: 0;
+    margin: 0;
+}
+
+.colorbox {
+    width: 30px;
+    height: 16px;
+    padding-left: 20px;
+    padding-right: 20px;
+    margin-right: 10px;
+}
+
+.item3d_data {
+    border: 1px solid #777777;
+    padding: 4px;
+    background-color: #e9e9f1;
+    color: #644c51;
+}
+
+.close_legend_icon {
+    color: #4c4c4c;
+    cursor: pointer;
+    position: absolute;
+    top: 4px;
+    left: 4px;
+}
+
+.window_title {
+    text-align: center;
+    font-weight: bold;
+}
+
+.fullscreen {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    padding: 0 0 0 0 !important;
+    z-index: 5;
+}
+
+.areas {
+    border: 2px solid $o-enterprise-color;
+    border-radius: 5px;
+    padding: 2px 2px 2px 2px;
+    position: absolute;
+    z-index: 10;
+    background-color: white;
+    width: 200px;
+    text-align: left;
+    bottom: 80px;
+    left: 16px;
+}
+
+.threedview-error {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    background-image: url("/web_threed/static/src/img/empty-scene.png");
+    background-position: center;
+    background-repeat: no-repeat;
+    background-size: cover;
+}

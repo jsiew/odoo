@@ -1,0 +1,29 @@
+<?xml version='1.0' encoding='utf-8'?>
+<odoo>
+    <record id="stock_picking_type_kanban_inherit" model="ir.ui.view">
+        <field name="name">stock.picking.type.kanban.inherit</field>
+        <field name="model">stock.picking.type</field>
+        <field name="inherit_id" ref="stock.stock_picking_type_kanban"/>
+        <field name="arch" type="xml">
+            <div t-if="!selection_mode">
+                <xpath expr="//div[hasclass('container o_kanban_card_content')]" position="inside">
+                    <div class="row">
+                        <div class="col-12 o_kanban_primary_left">
+                            <field name="barcode" invisible="1"/>
+                            <br />
+                            <button name="action_open_shipment_wizard" string="Scan QR Code"  type="object" 
+                            attrs="{'invisible': [('barcode', 'not in', ('WH-RECEIPTS'))]} "
+                            class="btn btn-primary oe_highlight">Scan QR Code</button>
+
+                            <field name="barcode" invisible="1"/>
+                            <br />
+                            <button name="action_open_shipment_outbound_wizard" string="Retrieve Booking"  type="object" 
+                            attrs="{'invisible': [('barcode', 'not in', ('WH-DELIVERY'))]} "
+                            class="btn btn-primary oe_highlight">Retrieve Booking</button>
+                        </div>
+                    </div>
+                </xpath>
+            </div>
+        </field>
+    </record>
+</odoo>

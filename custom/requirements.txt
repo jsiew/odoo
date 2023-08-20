@@ -1,0 +1,26 @@
+# generated from manifests external_dependencies
+apispec
+apispec>=4.0.0
+cachetools
+cerberus
+contextvars
+cryptography
+email_validator
+extendable
+extendable-pydantic
+graphene
+graphql_server
+jsondiff
+lxml
+marshmallow
+marshmallow-objects>=2.0.0
+parse-accept-language
+pydantic
+pyjwt
+pyquerystring
+pysaml2
+python-jose
+python-ldap
+typing-extensions
+zxcvbn
+#put python-ldap whl in c:\python310 folder then pip install

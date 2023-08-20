@@ -1,0 +1,145 @@
+<?xml version='1.0' encoding='utf-8'?>
+<odoo>
+    <record id="shipment_wizard_view" model="ir.ui.view">
+        <field name="name">Scan Pallets</field>
+        <field name="model">shipment_order.scan</field>
+        <field name="mode">primary</field>
+        <field name="inherit_id" ref="multi_step_wizard.multi_step_wizard_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//footer" position="before">
+                <h4>
+                    <field name="state" readonly="1"/>
+                </h4>
+                <div name="start" attrs="{'invisible': [('state', '!=', 'start')]}">
+                    <group>
+                        <field name="pickup_location_tag_id" invisible="1"/>
+                        <field name="pickup_location" required="1" options="{'no_create': True}"/>
+                        <field name="is_wcs_order" string="Create WCS Transport Order"/>
+                        <field name="qr_code_data"/>
+                        <field name="shipment_type" invisible="1" />
+                    </group>
+                    <hr />
+                    <p><h4 class="modal-title text-break">Scanned Data</h4></p>
+                    
+                    <group>
+                        <group>
+                            <field name="ref_number" string="B/L No." attrs="{'invisible': [('shipment_type', '=', 'E')]}"  readonly="1"/>
+                            <field name="ref_number" string="Booking No." attrs="{'invisible': [('shipment_type', '=', 'I')]}"  readonly="1"/>
+                            <field name="container_number"  readonly="1"/>
+                            <field name="seal_number"  readonly="1"/>
+                            <field name="container_size"  readonly="1"/>
+                            <field name="customer"  readonly="1"/>
+                            <field name="length"  readonly="1"/>
+                            <field name="height"  readonly="1"/>
+                        </group>
+                        <group>
+                            <field name="vessel_name"  readonly="1"/>
+                            <field name="voyage_number"  readonly="1"/>
+                            <field name="eta"  readonly="1"/>
+                            <field name="shipment_month"  readonly="1"/>
+                            <field name="shipment_week"  readonly="1"/>
+                            <field name="width"  readonly="1"/>
+                        </group>
+                    </group>
+                    <hr />
+                    <p><h4 class="modal-title text-break">Pallets</h4></p>
+                    <field name="pallet_ids">
+                        <tree create="0" edit="1" delete="1">
+                            <field name="pickup_location_tag_id" invisible="1"/>
+                            <field name="customer"/>
+                            <field name="ref_number"/>
+                            <field name="container_number"/>
+                            <field name="pallet_id"/>
+                            <field name="pickup_location" attrs="{'column_invisible': [('parent.shipment_type', '=', 'E')]}"/>
+                            <field name="is_wcs_order"/>
+                        </tree>
+                    </field>
+                </div>
+                <div name="review" attrs="{'invisible': [('state', '!=', 'review')]}">
+                    <field name="move_line_ids" create="0" edit="1" delete="0">
+                        <tree create="false" editable="top">
+                            <field name="pickup_location_tag_id" invisible="1"/>
+                            <field name="pallet_name" readonly="1"/>
+                            <field name="inbound_from" string="Pickup"/>
+                            <field name="location_dest_id" string="Destination"/>
+                        </tree>
+                    </field>
+                </div>
+                <div name="final" attrs="{'invisible': [('state', '!=', 'final')]}">
+                    <p>The following transport orders have been created</p>
+                    <field name="wcs_order_ids" readonly="1">
+                        <tree>
+                            <field name="location_id" string="Pickup"/>
+                            <field name="location_dest_id" string="Destination"/>
+                            <field name="pallet_id"/>
+                            <field name="wcs_state_summary"/>
+                            <field name="wcs_id_summary"/>
+                        </tree>
+                    </field>
+                </div>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="shipment_order_scan_line_view_form" model="ir.ui.view">
+        <field name="name">shipment_order.scan.line.view.form</field>
+        <field name="model">shipment_order.scan.line</field>
+        <field name="arch" type="xml">
+            <form string="Pallet Details">
+                <sheet>
+                    <group>
+                        <field name="pickup_location_tag_id" invisible="1"/>
+                        <field name="shipment_type" invisible="1"/>
+                        <field name="qr_code_data" string="QR Code"/>
+                        <field name="pickup_location" required="1" options="{'no_create': True}"/>
+                    </group>
+                    <group>
+                        <group>
+                            <field name="ref_number" string="B/L No." attrs="{'invisible': [('shipment_type', '=', 'E')]}"/>
+                            <field name="ref_number" string="Booking No." attrs="{'invisible': [('shipment_type', '=', 'I')]}"/>
+                            <field name="container_number"/>
+                            <field name="seal_number"/>
+                            <field name="container_size"/>
+                            <field name="customer"/>
+                            <field name="is_wcs_order"/>
+                        </group>
+                        <group>
+                            <field name="vessel_name"/>
+                            <field name="voyage_number"/>
+                            <field name="eta"/>
+                            <field name="shipment_month"/>
+                            <field name="shipment_week"/>
+                            <field name="length"/>
+                            <field name="width"/>
+                            <field name="height"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!--WIZARD FOR EDITING WCS STATE-->
+    <record id="shipment_order_move_edit_view" model="ir.ui.view">
+        <field name="name">Edit WCS Order State</field>
+        <field name="model">shipment_order.move.edit.wizard</field>
+        
+        <field name="arch" type="xml">
+            <form string="Edit WCS Order State">
+                <group>
+                    <field name="transport_id" invisible="1"/>
+                    <field name="wcs_desc"/>
+                    <field name="curr_state_1"/>
+                    <field name="curr_state_2"/>
+                    <field name="new_state"/>
+                    <field name="update_wcs" attrs="{'invisible': [('new_state', '=', 'completed')]}"/>
+                </group>
+                <footer>
+                    <button name="action_update_order" string="Submit" type="object" class="btn-primary"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel"/> 
+                </footer>  
+            </form>
+        </field>
+    </record>
+    
+</odoo>

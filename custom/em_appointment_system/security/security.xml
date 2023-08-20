@@ -1,0 +1,71 @@
+<odoo>
+    <data>
+
+        <record id="em_appointment_system.eas_module_category" model="ir.module.category">
+            <field name="description">Helps you handle your appointment.</field>
+            <field name="name">Appointment System</field>
+            <field name="sequence">99</field>
+        </record>
+
+        <record id="group_eas" model="res.groups">
+            <field name="name">User: Own Documents Only</field>
+            <field name="category_id" ref="em_appointment_system.eas_module_category"/>
+            <field name="implied_ids" eval="[(4, ref('base.group_user'))]"/>
+            <field name="comment">the user will have access to his own data in the Appointment.</field>
+        </record>
+
+        <record id="group_eas_all_leads" model="res.groups">
+            <field name="name">All Appointment Creator &amp; Modifier</field>
+            <field name="category_id" ref="em_appointment_system.eas_module_category"/>
+            <field name="implied_ids" eval="[(4, ref('group_eas'))]"/>
+            <field name="comment">the user will have access to all records of everyone in the Appointment.</field>
+        </record>
+
+        <record id="group_eas_manager" model="res.groups">
+            <field name="name">Administrator</field>
+            <field name="comment">the user will have an access to the Appointment.
+            </field>
+            <field name="category_id" ref="em_appointment_system.eas_module_category"/>
+            <field name="implied_ids" eval="[(4, ref('group_eas_all_leads'))]"/>
+            <field name="users" eval="[(4, ref('base.user_root')), (4, ref('base.user_admin'))]"/>
+        </record>
+
+        <record id="eas_desk_rule_all" model="ir.rule">
+            <field name="name">All Users</field>
+            <field ref="em_appointment_system.model_em_appointment_user" name="model_id"/>
+            <field name="domain_force">['|',('user_id','=',user.id),('user_id','=',False)]</field>
+            <field name="groups" eval="[(4, ref('em_appointment_system.group_eas'))]"/>
+        </record>
+
+        <record id="eas_desk_rule_manager" model="ir.rule">
+            <field name="name">Admin</field>
+            <field ref="em_appointment_system.model_em_appointment_user" name="model_id"/>
+            <field name="domain_force">[]</field>
+            <field name="groups" eval="[(4, ref('em_appointment_system.group_eas_manager'))]"/>
+        </record>
+
+
+        <record id="eas_rule_Own" model="ir.rule">
+            <field name="name">Own Appointment System</field>
+            <field ref="em_appointment_system.model_em_appointment_system" name="model_id"/>
+            <field name="domain_force">['|',('user_id','=',user.id),('user_id','=',False)]</field>
+            <field name="groups" eval="[(4, ref('em_appointment_system.group_eas'))]"/>
+        </record>
+
+        <record id="eas_rule_all" model="ir.rule">
+            <field name="name">All Appointment Creator &amp; Modifier</field>
+            <field ref="em_appointment_system.model_em_appointment_system" name="model_id"/>
+            <field name="domain_force">[]</field>
+            <field name="perm_unlink" eval="False"/>
+            <field name="groups" eval="[(4, ref('em_appointment_system.group_eas_all_leads'))]"/>
+        </record>
+
+        <record id="eas_rule_manager" model="ir.rule">
+            <field name="name">Admin</field>
+            <field ref="em_appointment_system.model_em_appointment_system" name="model_id"/>
+            <field name="domain_force">[]</field>
+            <field name="groups" eval="[(4, ref('em_appointment_system.group_eas_manager'))]"/>
+        </record>
+
+    </data>
+</odoo>

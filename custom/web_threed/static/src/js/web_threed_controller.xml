@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<templates xml:space="preserve">
+    <t t-name="web_threed.View" owl="1">
+        <Layout display="props.display" className="'h-100 overflow-auto threed-layout'">
+            <t t-if="state.error and state.error.message">
+                <div class="threedview-error min-vh-100">
+                    <div class="container py-3 bg-white">
+                        <header class="p-3 mx-auto text-center">
+                            <!-- <img src="/web_threed/static/src/images/empty-scene.png"/> -->
+                            <h2 class="mb-3">
+                                <i class="fa fa-exclamation-triangle" />
+                                <t t-out="state.error.title" />
+                            </h2>
+                            We could not load the 3D scene. Please check the message below for more information
+                        </header>
+                        <div
+                            class="p-3 pb-md-4 mx-auto text-center d-flex justify-content-center"
+                        >
+                            <div class="alert alert-danger" role="alert">
+                                <t t-out="state.error.message" />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </t>
+            <div t-else="" t-ref="threed-container">
+                <span
+                    t-if="state.showAutoRefreshCountdown"
+                    class="refresh_countdown"
+                    aria-hidden="false"
+                    title="Countdown to next refresh"
+                >
+                    <t t-esc="state.autoRefreshCountdown" />
+                </span>
+                <a
+                    t-if="model.legendLoaded"
+                    class="fa fa-info-circle fa-2x legend_icon"
+                    aria-hidden="false"
+                    title="Legend"
+                    t-on-click.prevent="() => state.showLegend = !state.showLegend"
+                    role="button"
+                />
+                <div class="legend" t-if="state.showLegend">
+                    <a
+                        class="fa fa-times close_legend_icon"
+                        aria-hidden="false"
+                        title="Close"
+                        t-on-click.prevent="() => state.showLegend = false"
+                        role="button"
+                    />
+                    <div class="window_title">Legend</div>
+                    <ul class="legend_ul">
+                        <li
+                            t-foreach="model.legendItems"
+                            t-as="legend"
+                            t-key="legend.name"
+                        >
+                            <span
+                                class="colorbox"
+                                t-attf-style="background-color: #{legend.color}"
+                            />
+                            <span t-esc="legend.name" />
+                        </li>
+                    </ul>
+                </div>
+                <t
+                    t-component="props.Renderer"
+                    noAreaLoaded="props.archInfo.noAreaLoaded"
+                    noItem="props.archInfo.noItem"
+                    groundAreas="model.groundAreas"
+                    selectedGroundAreaId="state.selectedGroundAreaId"
+                    loadInfoForObjectId="onLoadInfoForObjectId.bind(this)"
+                    cameraConfig="props.archInfo.camera"
+                    all3dItems="model.all3dItems"
+                    selected3dItems="model.selected3dItems"
+                    templates="templates"
+                />
+                <div
+                    class="areas"
+                    t-if="model.groundAreas and model.groundAreas.length > 0"
+                >
+                    <select t-on-input="_updateSelectedAreaId">
+                        <t
+                            t-foreach="model.groundAreas"
+                            t-as="groundArea"
+                            t-key="groundArea.id"
+                        >
+                            <option
+                                t-esc="groundArea.name"
+                                t-att-value="groundArea.id"
+                                t-att-selected="groundArea.id == state.selectedGroundAreaId"
+                            />
+                        </t>
+                    </select>
+                </div>
+            </div>
+        </Layout>
+    </t>
+</templates>

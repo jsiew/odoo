@@ -1,0 +1,144 @@
+<?xml version='1.0' encoding='utf-8'?>
+<odoo>
+    <record id="stock.action_picking_tree_ready" model="ir.actions.act_window">
+        <field name="name">To Do Item</field>
+        <field name="context">{'contact_display': 'partner_address', 'search_default_available': 1}</field>
+    </record>
+    <record id="stock_picking_form_inherit" model="ir.ui.view">
+        <field name="name">stock.picking.form.inherit</field>
+        <field name="model">stock.picking</field>
+        <field name="inherit_id" ref="stock.view_picking_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="/form/sheet/group" position="before">
+                <group attrs="{'invisible':[('picking_type_id', 'not in', (1,2,3))], 
+                                'readonly':[('state', 'not in', ('draft','waiting'))]}">
+                    <group>
+                        <field name="state" invisible="1" />
+                        <field name="ref_number" string="B/L No." attrs="{'invisible': [('picking_type_code', '=', 'outgoing')],
+                                                                          'required': [('picking_type_code','in', ('incoming','outgoing'))]}"/>
+                        <field name="ref_number" string="Booking No." attrs="{'invisible': [('picking_type_code', '=', 'incoming')],
+                                                                          'required': [('picking_type_code','in', ('incoming','outgoing'))]}"/>
+                        
+                        <field name="vessel_name" />
+                        <field name="voyage_number" />
+                    </group>
+                    <group>
+                        <field name="eta" />
+                        <field name="shipment_month" />
+                        <field name="shipment_week" />
+                    </group>
+                </group>
+            </xpath>
+            <xpath expr="/form/sheet/notebook" position="before" >
+                <div attrs="{'invisible':[('picking_type_id', 'not in', (1,2,3))]}">
+                    <h4>Containers</h4>
+                    <field name="state" invisible="1" />
+                    <field name="container_ids" attrs="{'invisible':[('picking_type_id', '!=', 1)]}">
+                        <tree create="false">
+                            <field name="container_number"/>
+                            <field name="container_number_actual" />
+                            <field name="seal_number" />
+                            <field name="container_size"/>
+                            <field name = "pallet_ids" widget="many2many_tags" />
+                        </tree>
+                    </field>
+                    <field name="outgoing_container_ids" attrs="{'invisible':[('picking_type_id', '!=', 2)],'readonly':[('state', 'not in', ('draft','waiting','assigned'))]}">
+                        <tree create="false" delete="false">
+                            <field name="container_number" />
+                            <field name="seal_number" />
+                            <field name="container_size" />
+                            <field name = "pallet_ids" widget="many2many_tags" />
+                        </tree>
+                    </field>
+                </div>
+                <div attrs="{'invisible':[('picking_type_id', 'not in', (1,2,3))]}">
+                    <h4>Pallets</h4>
+                    <field name="pallet_ids" attrs="{'readonly':[('state', 'not in', ('draft','waiting'))]}">
+                        <tree groupby="container_number" edit="false" create="false">
+                            <field name="qr_code_data" width="150px"/>
+                            <field name="name" width="150px"/>
+                            <field name="container_number" width="150px"/>
+                            <field name="container_number_actual" width="150px"/>
+                            <field name="cargo_length"/>
+                            <field name="cargo_width"/>
+                            <field name="cargo_height"/>
+                        </tree>
+                    </field>
+                    <!-- 
+                    <button name="action_confirm_pallets" type="object" string="Confirm"
+                        attrs="{'invisible': [('state', 'not in', ('draft','waiting')),
+                                                ('wcs_status', 'not in', ('pending'))]} "
+                        class="oe_highlight" groups="base.group_user"/> -->
+                </div>
+                <hr />
+            </xpath>
+            <xpath expr="//field[@name='move_line_nosuggest_ids']" position="attributes">
+                <attribute name="attrs">{'readonly': ['|', '|', ('show_operations', '=', False), ('state', '=', 'cancel'), '&amp;', ('state', '=', 'done'), ('is_locked', '=', True)], 'invisible': [('show_reserved', '=', True)]}</attribute>
+            </xpath>
+            <xpath expr="//field[@name='move_ids_without_package']" position="attributes">
+               <attribute name="attrs">{'readonly': ['&amp;', ('state', '=', 'done'), ('is_locked', '=', True)]}</attribute>
+            </xpath>
+            <xpath expr="/form/sheet/notebook/page[3]" position="after" >
+                <page string="WCS Transport Orders" name="transport_orders">
+                    <field name="wcs_order_ids" readonly="1">
+                        <tree>
+                            <field name="location_id" string="Pickup"/>
+                            <field name="location_dest_id" string="Destination"/>
+                            <field name="pallet_id"/>
+                            <field name="wcs_overall_state"
+                                decoration-primary="wcs_overall_state == 'created'"
+                                decoration-success="wcs_overall_state == 'completed'"
+                                decoration-info="wcs_overall_state not in ['cancelled','error','completed','cancelling','created']"
+                                decoration-danger="wcs_overall_state in ['cancelled','error','cancelling']"
+                                widget="badge"/>
+                            <field name="wcs_order_desc"/>
+                            <field name="wcs_state_summary" />
+                            <field name="wcs_timestamp" string="Created At"/>
+                        </tree>
+                    </field>
+                </page>
+            </xpath>
+            <xpath expr="/form/div" position="replace">
+                <div class="oe_chatter" style="width:15%">
+                    <field name="message_follower_ids"/>
+                    <field name="activity_ids"/>
+                    <field name="message_ids"/>
+                </div>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="view_picking_internal_search_inherit" model="ir.ui.view">
+        <field name="name">stock.picking.internal.search.inherit</field>
+        <field name="model">stock.picking</field>
+        <field name="inherit_id" ref="stock.view_picking_internal_search"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='origin']" position="replace">
+                <field name="ref_number"/>
+                <field name="move_line_ids"
+                        string="Container"
+                        filter_domain="[('move_line_ids.container_number', 'ilike', self)]"/>
+                <field name="move_line_ids"
+                        string="Pallet"
+                        filter_domain="[('move_line_ids.pallet_id.name', 'ilike', self)]"/>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="vpicktree_inherit" model="ir.ui.view">
+        <field name="name">stock.picking.tree.inherit</field>
+        <field name="model">stock.picking</field>
+        <field name="inherit_id" ref="stock.vpicktree"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='scheduled_date']" position="after">
+                <field name="shipment_month"  optional="show" string="Month"/>
+                <field name="shipment_week"  optional="show" string="Week"/>
+            </xpath>
+            <xpath expr="//field[@name='origin']" position="replace">
+                <field name="ref_number"  optional="show"/>
+                <field name="num_containers"  optional="show"/>
+                <field name="num_pallets"  optional="show"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>

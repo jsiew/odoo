@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>   
+        <record id="view_move_line_tree_detailed_inherit" model="ir.ui.view">
+            <field name="name">stock.move.line.tree.detailed.inherit</field>
+            <field name="model">stock.move.line</field>
+            <field name="inherit_id" ref="stock.view_move_line_tree_detailed" />
+            <field name="arch" type="xml">
+                <xpath expr="//field[@name='qty_done']" position="after">
+                    <field name="is_wcs_order"/>
+                </xpath>
+                <xpath expr="//field[@name='lot_id']" position="replace">
+                    <field name="lot_id" string="Pallet" width="120px" groups="stock.group_production_lot" optional="hide"/>
+                </xpath>
+                <xpath expr="//field[@name='location_id']" position="replace">
+                    <field name="picking_code" invisible="1"/>
+                    <field name="pickup_location_tag_id" invisible="1"/>
+                    <field name="location_id" attrs="{'column_invisible': [('picking_code', '=', 'incoming')]}" options="{'no_create': True}"/>
+                    <field name="inbound_from" attrs="{'column_invisible': [('picking_code', '!=', 'incoming')]}" />
+                </xpath>
+            </field>
+        </record>
+
+        <record id="view_move_line_form_inherit" model="ir.ui.view">
+            <field name="name">stock.move.line.form.inherit</field>
+            <field name="model">stock.move.line</field>
+            <field name="inherit_id" ref="stock.view_move_line_form" />
+            <field name="arch" type="xml">
+                <xpath expr="//field[@name='state']" position="attributes">
+                    <attribute name="attrs">{'invisible': 1}</attribute>
+                </xpath>
+                <xpath expr="//form" position="attributes">
+                    <attribute name="attrs">{'readonly': [('is_wcs_order', '=', True)]}</attribute>
+                </xpath>
+                <xpath expr="//form/sheet/group" position="replace">
+                    <group>
+                        <group>
+                            <field name="picking_code" invisible="1"/>
+                            <field name="pickup_location_tag_id" invisible="1"/>
+                            <field name="date" attrs="{'readonly': [('is_wcs_order', '=', True)]}"/>
+                            <field name="reference" string="Reference"  attrs="{'readonly': [('is_wcs_order', '=', True)]}"/>
+                            <field name="origin" invisible="1"/>
+                            <field name="product_id"  attrs="{'readonly': [('is_wcs_order', '=', True)]}"/>
+                            <field name="location_id" attrs="{'invisible': [('picking_code', '=', 'incoming')],'readonly': [('is_wcs_order', '=', True)]}" options="{'no_create': True}"/>
+                            <field name="inbound_from" string="Pickup Location" attrs="{'invisible': [('picking_code', '!=', 'incoming')],'readonly': [('is_wcs_order', '=', True)]}"/>
+                            <field name="location_dest_id" attrs="{'readonly': [('is_wcs_order', '=', True)]}" options="{'no_create': True}" groups="stock.group_stock_multi_locations"/>
+                        </group>
+                        <group>
+                            <div class="o_row" attrs="{'invisible': [('state', '=', 'done')]}">
+                                <label for="reserved_uom_qty" />
+                                <field name="reserved_uom_qty" readonly="1"/>
+                                <field name="product_uom_id" options="{'no_create': True}" string="Unit of Measure" groups="uom.group_uom"/>
+                                <br />
+                            </div>
+                            <div class="o_row">
+                                <label for="qty_done" />
+                                <field name="qty_done" string="Qty Done" attrs="{'readonly': [('is_wcs_order', '=', True)]}"/>
+                                <field name="product_uom_id" options="{'no_create': True}"  string="Unit of Measure" groups="uom.group_uom"/>
+                            </div>
+                            <field name="lot_id" string="Pallet" groups="stock.group_production_lot" context="{'default_product_id': product_id, 'active_picking_id': picking_id, 'default_company_id': company_id}" attrs="{'invisible': [('lot_id', '=', False),('lot_name', '!=', False)],'readonly': [('is_wcs_order', '=', True)]}"/>
+                            <field name="lot_name" groups="stock.group_production_lot" attrs="{'invisible': ['|',('lot_id', '!=', False),('lot_name', '=', False)]}"/>
+                            <field name="package_id" string="Source Package" groups="stock.group_tracking_lot"/>
+                            <field name="result_package_id" string="Destination Package" groups="stock.group_tracking_lot"/>
+                            <field name="owner_id" string="Owner" groups="stock.group_tracking_owner"/>
+                            <field name="create_uid" string="Done By" widget="many2one_avatar_user" optional="hide"/>
+                            <field name="is_wcs_order" readonly="1"/>
+                        </group>
+                    </group>
+                    <div attrs="{'invisible': [('transport_order_id', '=', 'False')]}">
+                        <field name="transport_order_id" invisible="1"/>
+                        <h4>
+                            Transport Order 1 - ID 
+                            <field name="transport_order_wcs_id_1" readonly="1"/>:
+                            <field name="transport_order_state_1" readonly="1"
+                                decoration-primary="transport_order_state_1 == 'created'"
+                                decoration-success="transport_order_state_1 == 'completed'"
+                                decoration-info="transport_order_state_1 not in ['cancelled','error','completed','cancelling','created']"
+                                decoration-danger="transport_order_state_1 in ['cancelled','error','cancelling']"
+                                widget="badge"/>
+                        </h4>
+                        <div attrs="{'invisible': [('transport_order_wcs_id_2', '=', 'False')]}">
+                            <h4>
+                                Transport Order 2 - ID 
+                                <field name="transport_order_wcs_id_2" readonly="1"/>:
+                                <field name="transport_order_state_2" readonly="1"
+                                    decoration-primary="transport_order_state_2 == 'created'"
+                                    decoration-success="transport_order_state_2 == 'completed'"
+                                    decoration-info="transport_order_state_2 not in ['cancelled','error','completed','cancelling','created']"
+                                    decoration-danger="transport_order_state_2 in ['cancelled','error','cancelling']"
+                                    widget="badge"/>
+                            </h4>
+                        </div>
+                        <label for="transport_order_description" />
+                        <field name = "transport_order_description" readonly ="1" />
+                        <field name="transport_order_log_ids" readonly="1" string="">
+                            <tree>
+                                <field name="wcs_message_type"
+                                    decoration-primary="wcs_message_type == 'system'"
+                                    decoration-info="wcs_message_type not in ['system','error']"
+                                    decoration-danger="wcs_message_type == 'error'"
+                                    widget="badge"/>
+                                <field name="remarks"/>
+                                <field name="wcs_id"/>
+                                <field name="wcs_message"/>
+                                <field name="wcs_message_code"/>
+                                <field name="wcs_notification_code"/>
+                                <field name="wcs_timestamp"/>
+                            </tree>
+                        </field>
+                    </div>
+                </xpath>
+            </field>
+        </record>
+    </data>
+</odoo>
