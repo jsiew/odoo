@@ -40,6 +40,7 @@ class StockPicking(models.Model):
     def _compute_qty(self):
         for record in self:
             record.num_containers = len(record.container_ids)
+            if record.num_containers == 0: record.num_containers = len(record.outgoing_container_ids)
             record.num_pallets = len(record.pallet_ids)
 
     def button_validate(self):

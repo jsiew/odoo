@@ -23,7 +23,7 @@
                             decoration-info="transport_order_overall_state not in ['cancelled','error','completed','cancelling','created']"
                             decoration-danger="transport_order_overall_state in ['cancelled','error','cancelling']"
                             widget="badge"/>
-                    <button name="action_update_wcs_order" icon="fa-edit" type="object" attrs="{'invisible': ['|',('transport_order_overall_state', 'in', ('cancelled','completed')),('transport_order_id', '=', False)]}"/>
+                    <button name="action_update_wcs_order" icon="fa-edit" type="object" attrs="{'invisible': ['|','&amp;',('transport_order_id','=',None),('qty_done','!=',0),('transport_order_overall_state', 'in', ('cancelled','completed',None,False))]}"/>
                 </xpath>
                 <xpath expr="//field[@name='location_dest_id'][1]" position="replace">
                     <field name="pickup_location_tag_id" invisible="1"/>

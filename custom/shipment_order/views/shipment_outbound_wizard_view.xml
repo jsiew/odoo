@@ -12,14 +12,18 @@
                 </h4>
                 <div name="start" attrs="{'invisible': [('state', '!=', 'start')]}">
                     <group>
-                        <field name="ref_number" required="1"/>
+                        <field name="customer"/>
+                        <field name="shipment_month"/>
+                        <field name="shipment_week"/>
                         <field name="container_id" options="{'no_create': True}"/>
+                        
+                        <field name="ref_number" readonly="1"/>
                         <field name="container_number_actual" options="{'no_create': True}"/>
                     </group>
                     <hr />
                     <p><h4 class="modal-title text-break">Pallets</h4></p>
                     <field name="pallet_ids">
-                        <tree create="0" edit="1" delete="1">
+                        <tree create="0" edit="1" delete="0">
                             <field name="pallet_id"/>
                             <field name="pickup_location"/>
                             <field name="drop_off_location"/>
@@ -27,7 +31,6 @@
                             <field name="width"/>
                             <field name="height"/>
                             <field name="is_wcs_order"/>
-                            <field name="process_pallet"/>
                         </tree>
                     </field>
                 </div>
@@ -56,14 +59,13 @@
                     <group>
                         <field name="pickup_location" readonly="1" required="1" options="{'no_create': True}"/>
                         <field name="drop_off_location" required="1" options="{'no_create': True}"/>
-                        <field name="process_pallet"/>
                         <field name="is_wcs_order"/>
                     </group>
                     <group>
-                        <field name="pallet_id"/>
-                        <field name="length"/>
-                        <field name="width"/>
-                        <field name="height"/>
+                        <field name="pallet_id" readonly="1" />
+                        <field name="length" readonly="1" />
+                        <field name="width" readonly="1" />
+                        <field name="height" readonly="1" />
                     </group>
                 </sheet>
             </form>

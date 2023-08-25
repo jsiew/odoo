@@ -124,20 +124,18 @@ def create_notification(
                         env.user.notify_success(message=notification_message,title="WCS Order Completed", sticky=False)
                                 
                     case "cancelled":
-                        #delete
-                        if wcs_order.move_line_id.state != 'done':
-                            wcs_order.move_line_id.unlink()
                         
                         if elevated_tray.id != False:
                             elevated_tray.write({'occupied_state' : 'Empty'})
 
-                        notification_message = '{}<br /><a href="{}">Pallet {} [Bkg/BL No.: {}]</a><br />Moving from {} to {}<br />WCS ID: {}, WMS Doc ID: {}'
-                        notification_message = notification_message.format(message, wcs_order_link, wcs_order.pallet_id.name, wcs_order.picking_id.ref_number, 
+                        notification_message = '{}<br />Pallet {} [Bkg/BL No.: {}]<br />Moving from {} to {}<br />WCS ID: {}, WMS Doc ID: {}'
+                        notification_message = notification_message.format(message, wcs_order.pallet_id.name, wcs_order.picking_id.ref_number, 
                                                                            pickup_location, dropoff_location,
                                                                            str(wcs_order.wcs_id_1) + (('/' + wcs_order.wcs_id_2) if wcs_order.wcs_id_2 else '') ,
                                                                             wcs_order.picking_id.name)
                     
                         env.user.notify_warning(message=notification_message,title="WCS Order Cancelled", sticky=True)
+                        
                      
                     case _:
                         notification_message = '{}<br /><a href="{}">Pallet {} [Bkg/BL No.: {}]</a><br />Moving from {} to {}<br />WCS ID: {}, WMS Doc ID: {}'
@@ -145,23 +143,29 @@ def create_notification(
                                                                            wcs_order.location_dest_id.name,
                                                                            str(wcs_order.wcs_id_1) + (('/' + wcs_order.wcs_id_2) if wcs_order.wcs_id_2 else '') ,
                                                                            wcs_order.picking_id.name)
-                        env.user.notify_info(message=notification_message,title="WCS Notification Received", sticky=True)
+                        env.user.notify_info(message=notification_message,title="WCS Notification Received", sticky=False)
 
                 #Write to log
                 log_id = wcs_log_obj.create({'remarks': 'WCS Notification Received',
-                            'wcs_message': message + ' [AGV: ' + subsystem_id + ']',
-                            'wcs_message_type':notification_type,
-                            'wcs_message_code': statusCode,
-                            'wcs_notification_code': code,
-                            'wcs_timestamp': datetime.today(),
-                            'wcs_raw_data':data,
-                            'transport_order' : wcs_order.id,
-                            'transport_order_number': order_seq,
-                            'wcs_id':notification.data['wcs_id']})
+                                'wcs_message': message + ' [AGV: ' + subsystem_id + ']',
+                                'wcs_message_type':notification_type,
+                                'wcs_message_code': statusCode,
+                                'wcs_notification_code': code,
+                                'wcs_timestamp': datetime.today(),
+                                'wcs_raw_data':data,
+                                'transport_order' : wcs_order.id if notification.data['wcs_state'] != "cancelled" else None,
+                                'transport_order_number': order_seq if notification.data['wcs_state'] != "cancelled" else None,
+                                'wcs_id':notification.data['wcs_id']})
                 res = {
                     'status': 'success',
                     'message': 'Notification Updated [Order '+ wcs_order.picking_id.name + ', Pallet ' + wcs_order.pallet_id.name +']'
                 }
+
+                
+                #delete cancelled order
+                if notification.data['wcs_state'] == "cancelled" and wcs_order.move_line_id.state != 'done':
+                    wcs_order.move_line_id.write({'qty_done': 0, 'reserved_uom_qty':0, 'state': 'draft'})
+                    wcs_order.move_line_id.unlink()
             else:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,

@@ -123,7 +123,7 @@ class StockMoveLine(models.Model):
             'res_model': 'shipment_order.move.edit.wizard',
             'view_id': self.env.ref('shipment_order.shipment_order_move_edit_view').id,
             'target': 'new',
-            'context': {'transport_order': self.transport_order_id.id} 
+            'context': {'transport_order': self.transport_order_id.id, 'move_line': self.id} 
         }
 
     def write(self, vals):

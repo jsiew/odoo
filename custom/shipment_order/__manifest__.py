@@ -32,6 +32,7 @@
             'shipment_order/static/src/js/stock_picking_functions.js',
         ],
         'web.assets_backend': [
+            'shipment_order/static/src/css/custom.css',
         ],
     },
     'installable': True,

@@ -9,6 +9,7 @@ class ShipmentMoveEditWizard(models.TransientModel):
     _name = "shipment_order.move.edit.wizard"
     _description = "Edit WCS Order State"
 
+    move_line_id = fields.Many2one('stock.move.line', 'Move Line')
     transport_id = fields.Many2one('shipment_order.move', 'WCS Order')
     wcs_desc = fields.Html(string="WCS Order Description",related='transport_id.wcs_order_desc')
     wcs_id_1 = fields.Char(string='WCS Order ID',related='transport_id.wcs_id_1')
@@ -30,162 +31,187 @@ class ShipmentMoveEditWizard(models.TransientModel):
                 raise exceptions.ValidationError("WCS orders in completed/cancelled state cannot be edited")
             else:
                 states=[('cancelled', 'Cancelled'),('completed', 'Completed')]
+        else:
+            states=[('cancelled', 'Cancelled'),('completed', 'Completed')]
         return states 
     
     @api.model
     def default_get(self, fields):
         result = super(ShipmentMoveEditWizard, self).default_get(fields)      
         id = self.env.context.get('transport_order')
+        move_line_id = self.env.context.get('move_line')
+
         transport_order = self.env['shipment_order.move'].browse(id)
+        move_line = self.env['stock.move.line'].browse(move_line_id)
         if transport_order.id:
             result.update({'transport_id': transport_order, 
                            'curr_state_1': transport_order.wcs_state_1, 
                            'curr_state_2': transport_order.wcs_state_2, 
                            'wcs_id_1': transport_order.wcs_id_1,
                            'wcs_id_2': transport_order.wcs_id_2})
-        else: raise exceptions.ValidationError("Invalid transport order id")
+        if move_line.id:
+            result.update({'move_line_id': move_line})
+        if move_line.id == False and transport_order.id == False: 
+            raise exceptions.ValidationError("Invalid transport order id")
         return result
     
     def action_update_order(self):
         record = self.transport_id
         
-        old_state = record.wcs_state
+        if record.id:
+            old_state_1 = record.wcs_state_1
+            old_state_2 = record.wcs_state_2
 
-        #completed state need not be sent to WCS, for updating in case WMS did not receive WCS notification
-        if self.update_wcs and self.new_state == 'completed':
-            self.update_wcs = False
+            #completed state need not be sent to WCS, for updating in case WMS did not receive WCS notification
+            if self.update_wcs and self.new_state == 'completed':
+                self.update_wcs = False
 
-        #check in case WCS updated the state before form was submitted
-        if record.wcs_overall_state in ('cancelled','completed'):
-            raise exceptions.ValidationError("WCS orders in completed/cancelled state cannot be edited")
-        
-        if self.update_wcs and self.new_state == 'cancelled':
-            wms_interface_url = self.env['ir.config_parameter'].sudo().get_param('shipment_order.wms_interface_url')
+            #check in case WCS updated the state before form was submitted
+            if record.wcs_overall_state in ('cancelled','completed'):
+                raise exceptions.ValidationError("WCS orders in completed/cancelled state cannot be edited")
             
-            #cancel transport order 1
-            if record.wcs_state_1 not in ('cancelled','completed'):
-
-                data = {
-                    "wcs_id": record.wcs_id_1,
-                }
-
-                try:
-                    response = requests.post(wms_interface_url + '/DeleteTransportOrder', json=data)
-                    if response.ok:
-                        try:
-                            response_json = response.json()
-                        except JSONDecodeError:
-                            raise ValidationError('Response could not be serialized: ' + response.text)
-                        result = bool(response_json['result'])
-                        msg = response_json['msg']
-                        statusCode = response_json['statusCode']
-                        responseCode = response_json['code']
-                        data = response_json['data']
-
-                        if result:
-                            record.write({'wcs_state_1': 'cancelled'})
-                            record.move_line_id.write({'qty_done': 0, 'reserved_qty':0,'state':'cancel'})
-                            remarks = 'Transport Order ' + record.wcs_id_1 + ' Manually Cancelled [Old State: '+ old_state +']'
-                            wcs_message_type = 'system'
-                            msg = ''
-                        else:
-                            wcs_message_type = 'system'
-                            raise exceptions.UserError('Error sending request to WCS, please try again. Status Code:' + str(response.status_code))
-                            
-                        log_obj = self.env['shipment_order.movelog']
-                        log_id = log_obj.create({'remarks': remarks,
-                                                        'wcs_message': msg,
-                                                        'wcs_message_type':wcs_message_type,
-                                                        'wcs_message_code': statusCode,
-                                                        'wcs_notification_code': responseCode,
-                                                        'wcs_timestamp': datetime.today(),
-                                                        'wcs_raw_data':data,
-                                                        'transport_order' : record.id,
-                                                        'transport_order_number': 1,
-                                                        'wcs_id': record.wcs_id_1})
-                    else: raise exceptions.UserError('Error sending request to WCS, please try again. Status Code:' + str(response.status_code))
-                except Exception as err:
-                    raise exceptions.UserError('Error sending request to WCS, please try again. '+ f"Unexpected {err=}, {type(err)=}")
-
-            #cancel transport order 2
-            if record.wcs_id_2 and record.wcs_state_2 not in ('cancelled','completed'):
-
-                data = {
-                    "wcs_id": record.wcs_id_2,
-                }
-
-                try:
-                    response = requests.post(wms_interface_url + '/DeleteTransportOrder', json=data)
-                    if response.ok:
-                        try:
-                            response_json = response.json()
-                        except JSONDecodeError:
-                            raise ValidationError('Response could not be serialized: ' + response.text)
-                        result = bool(response_json['result'])
-                        msg = response_json['msg']
-                        statusCode = response_json['statusCode']
-                        responseCode = response_json['code']
-                        data = response_json['data']
-
-                        if result:
-                            record.write({'wcs_state_2': 'cancelled'})
-                            remarks = 'Transport Order ' + record.wcs_id_2 + ' Manually Cancelled [Old State: '+ old_state +']'
-                            wcs_message_type = 'system'
-                            msg = ''
-                        else:
-                            wcs_message_type = 'system'
-                            raise exceptions.UserError('Error sending request to WCS, please try again. Status Code:' + str(response.status_code))
-                            
-                        log_obj = self.env['shipment_order.movelog']
-                        log_id = log_obj.create({'remarks': remarks,
-                                                        'wcs_message': msg,
-                                                        'wcs_message_type':wcs_message_type,
-                                                        'wcs_message_code': statusCode,
-                                                        'wcs_notification_code': responseCode,
-                                                        'wcs_timestamp': datetime.today(),
-                                                        'wcs_raw_data':data,
-                                                        'transport_order' : record.id,
-                                                        'transport_order_number': 2,
-                                                        'wcs_id': record.wcs_id_2})
-                    else: raise exceptions.UserError('Error sending request to WCS, please try again. Status Code:' + str(response.status_code))
-                except Exception as err:
-                    raise exceptions.UserError('Error sending request to WCS, please try again. '+ f"Unexpected {err=}, {type(err)=}")
+            if self.update_wcs and self.new_state == 'cancelled':
+                wms_interface_url = self.env['ir.config_parameter'].sudo().get_param('shipment_order.wms_interface_url')
                 
-        else:
-            record.write({'wcs_state_1': self.new_state})
-            elevated_tray = self.env['shipment_order.elevated.tray'].search(['|',
-                                ('open_side_code','=',record.wcs_dropoff_1),
-                                ('closed_side_code','=',record.wcs_dropoff_1)
-                                ], limit=1)
-            if elevated_tray.id != False:
-                            elevated_tray.write({'occupied_state' : 'Empty'})
-            
-            if record.wcs_id_2:  
-                record.write({'wcs_state_2': self.new_state})
+                #cancel transport order 1
+                if record.wcs_state_1 not in ('cancelled','completed'):
+
+                    data = {
+                        "wcs_id": record.wcs_id_1,
+                    }
+
+                    try:
+                        response = requests.post(wms_interface_url + '/DeleteTransportOrder', json=data)
+                        if response.ok:
+                            try:
+                                response_json = response.json()
+                            except JSONDecodeError:
+                                raise ValidationError('Response could not be serialized: ' + response.text)
+                            result = bool(response_json['result'])
+                            msg = response_json['msg']
+                            statusCode = response_json['statusCode']
+                            responseCode = response_json['code']
+                            data = response_json['data']
+
+                            if result:
+                                remarks = 'Transport Order ' + record.wcs_id_1 + ' Manually Cancelled [Old State: '+ old_state_1 +']'
+                                wcs_message_type = 'system'
+                                record.write({'wcs_state_1': 'cancelled'})
+                                msg = ''
+                            else:
+                                wcs_message_type = 'system'
+                                raise exceptions.UserError('Error sending request to WCS, please try again. Status Code:' + str(response.status_code))
+                                
+                            log_obj = self.env['shipment_order.movelog']
+                            log_id = log_obj.create({'remarks': remarks,
+                                                            'wcs_message': msg,
+                                                            'wcs_message_type':wcs_message_type,
+                                                            'wcs_message_code': statusCode,
+                                                            'wcs_notification_code': responseCode,
+                                                            'wcs_timestamp': datetime.today(),
+                                                            'wcs_raw_data':data,
+                                                            'transport_order' : None,
+                                                            'transport_order_number': None,
+                                                            'wcs_id': record.wcs_id_1})
+                        else: raise exceptions.UserError('Error sending request to WCS, please try again. Status Code:' + str(response.status_code))
+                    except Exception as err:
+                        raise exceptions.UserError('Error sending request to WCS, please try again. '+ f"Unexpected {err=}, {type(err)=}")
+
+                #cancel transport order 2
+                if record.wcs_id_2 and record.wcs_state_2 not in ('cancelled','completed'):
+
+                    data = {
+                        "wcs_id": record.wcs_id_2,
+                    }
+
+                    try:
+                        response = requests.post(wms_interface_url + '/DeleteTransportOrder', json=data)
+                        if response.ok:
+                            try:
+                                response_json = response.json()
+                            except JSONDecodeError:
+                                raise ValidationError('Response could not be serialized: ' + response.text)
+                            result = bool(response_json['result'])
+                            msg = response_json['msg']
+                            statusCode = response_json['statusCode']
+                            responseCode = response_json['code']
+                            data = response_json['data']
+
+                            if result:
+                                record.write({'wcs_state_2': 'cancelled'})
+                                remarks = 'Transport Order ' + record.wcs_id_2 + ' Manually Cancelled [Old State: '+ old_state_2 +']'
+                                wcs_message_type = 'system'
+                                msg = ''
+                            else:
+                                wcs_message_type = 'system'
+                                raise exceptions.UserError('Error sending request to WCS, please try again. Status Code:' + str(response.status_code))
+                                
+                            log_obj = self.env['shipment_order.movelog']
+                            log_id = log_obj.create({'remarks': remarks,
+                                                            'wcs_message': msg,
+                                                            'wcs_message_type':wcs_message_type,
+                                                            'wcs_message_code': statusCode,
+                                                            'wcs_notification_code': responseCode,
+                                                            'wcs_timestamp': datetime.today(),
+                                                            'wcs_raw_data':data,
+                                                            'transport_order' : None,
+                                                            'transport_order_number': None,
+                                                            'wcs_id': record.wcs_id_2})
+                        else: raise exceptions.UserError('Error sending request to WCS, please try again. Status Code:' + str(response.status_code))
+                    
+                    except Exception as err:
+                        raise exceptions.UserError('Error sending request to WCS, please try again. '+ f"Unexpected {err=}, {type(err)=}")
+                
+                #delete
+                record.move_line_id.write({'qty_done': 0, 'reserved_uom_qty':0, 'state': 'draft'})
+                record.move_line_id.unlink()
+                    
+            else:
+                record.write({'wcs_state_1': self.new_state})
                 elevated_tray = self.env['shipment_order.elevated.tray'].search(['|',
-                                ('open_side_code','=',record.wcs_dropoff_2),
-                                ('closed_side_code','=',record.wcs_dropoff_2)
-                                ], limit=1)
+                                    ('open_side_code','=',record.wcs_dropoff_1),
+                                    ('closed_side_code','=',record.wcs_dropoff_1)
+                                    ], limit=1)
                 if elevated_tray.id != False:
                                 elevated_tray.write({'occupied_state' : 'Empty'})
+                
+                if record.wcs_id_2:  
+                    record.write({'wcs_state_2': self.new_state})
+                    elevated_tray = self.env['shipment_order.elevated.tray'].search(['|',
+                                    ('open_side_code','=',record.wcs_dropoff_2),
+                                    ('closed_side_code','=',record.wcs_dropoff_2)
+                                    ], limit=1)
+                    if elevated_tray.id != False:
+                                    elevated_tray.write({'occupied_state' : 'Empty'})
+                
+                
+                
+                log_obj = self.env['shipment_order.movelog']
+                log_id = log_obj.create({'remarks': 'Transport Order manually changed from '+ old_state_1 +' to '+ self.new_state + '. (Not updated to WCS)' ,
+                                                    'wcs_message': '',
+                                                    'wcs_message_type':'system',
+                                                    'wcs_message_code': '',
+                                                    'wcs_notification_code': '',
+                                                    'wcs_timestamp': datetime.today(),
+                                                    'wcs_raw_data':'',
+                                                    'transport_order' : record.id if self.new_state != 'cancelled' else None,
+                                                    'transport_order_number': 1 if self.new_state != 'cancelled' else None,
+                                                    'wcs_id': record.wcs_id_1})
+                
+                if self.new_state == 'cancelled':
+                    record.move_line_id.write({'qty_done': 0, 'reserved_uom_qty':0, 'state': 'draft'})
+                    record.move_line_id.unlink()
+                else: 
+                    record.move_line_id.write({'qty_done': 1, 'reserved_uom_qty':0})
+                    record.move_line_id._action_done()
 
+        else:
             if self.new_state == 'cancelled':
-                record.move_line_id.write({'qty_done': 0, 'reserved_uom_qty':0})
-            else: 
-                record.move_line_id.write({'qty_done': 1, 'reserved_uom_qty':0})
-                record.move_line_id._action_done()
-            log_obj = self.env['shipment_order.movelog']
-            log_id = log_obj.create({'remarks': 'Transport Order manually changed from '+ old_state +' to '+ self.new_state + '. (Not updated to WCS)' ,
-                                            'wcs_message': '',
-                                            'wcs_message_type':'system',
-                                            'wcs_message_code': '',
-                                            'wcs_notification_code': '',
-                                            'wcs_timestamp': datetime.today(),
-                                            'wcs_raw_data':'',
-                                            'transport_order' : record.id,
-                                            'transport_order_number': 1,
-                                            'wcs_id': record.wcs_id_1})
-
+                self.move_line_id.write({'qty_done': 0, 'reserved_uom_qty':0, 'state': 'draft'})
+                self.move_line_id.unlink()
+            else:
+                self.move_line_id.write({'qty_done': 1, 'reserved_uom_qty':0})
+                self.move_line_id._action_done()
 
 class ShipmentScan(models.TransientModel):
     _name = "shipment_order.scan.line"
@@ -412,9 +438,9 @@ class ShipmentWizard(models.TransientModel):
                 existing_pallet = self.env['shipment_order.pallet'].search([
                                 ('name', '=', qr_pallet_id),
                                 ('container_id.ref_number', '=', qr_ref_id),
-                                ('company_id', '=', self.company_id.id),'|',
-                                ('move_line_id.transport_order_id.wcs_state_1', 'not in', ('cancelled','error')),
-                                ('move_line_id.transport_order_id.wcs_state_2', 'not in', ('cancelled','error',False))
+                                ('company_id', '=', self.company_id.id),#'|',
+                                #('move_line_id.transport_order_id.wcs_state_1', 'not in', ('cancelled','error',False)),
+                                #('move_line_id.transport_order_id.wcs_state_2', 'not in', ('cancelled','error',False))
                                 ], limit=1)
                 if existing_pallet.id:
                     raise exceptions.ValidationError("Pallet ID " + qr_pallet_id + " has already been added")
@@ -473,7 +499,11 @@ class ShipmentWizard(models.TransientModel):
                                                          'shipment_scan_id': self.id})    
     
     def action_process_scanned_lines(self):
+        pallet_list = []
         for pallet in self.pallet_ids:
+            pallet_list.append(pallet)
+        pallet_list.sort(key=lambda x: x.height)
+        for pallet in pallet_list:
             #CREATE/RETRIEVE PICKING
             picking_obj = self.env['stock.picking']
             existing_picking = picking_obj.search([
@@ -492,7 +522,8 @@ class ShipmentWizard(models.TransientModel):
                                     'voyage_number': pallet.voyage_number,
                                     'eta': pallet.eta,
                                     'shipment_month': pallet.shipment_month,
-                                    'shipment_week': pallet.shipment_week
+                                    'shipment_week': pallet.shipment_week,
+                                    'scheduled_date': pallet.eta
                                     })
             self.WIZARD_PICKING_IDS.append(existing_picking.id)
             print("PICKING:" + str(existing_picking))
@@ -515,6 +546,8 @@ class ShipmentWizard(models.TransientModel):
                                                     'seal_number':pallet.seal_number,
                                                     'container_size': pallet.container_size,
                                                     'picking_id': existing_picking.id})
+            else: 
+                if len(existing_container.pallet_ids) == 0: is_newly_created_container = True
             
             print("CONTAINER:" + str(existing_container))
 
@@ -551,107 +584,162 @@ class ShipmentWizard(models.TransientModel):
 
     def action_process_wcs_orders(self):
         
-        #only 1 pallet, send straight to rack
-        if len(self.move_line_ids) == 1:
+        #only 1 short pallet, send straight to rack
+        if len(self.move_line_ids) == 1 and 'TALL_PALLET' not in move_line.product_id.code:
             move_line = self.move_line_ids[0]
             pallet = move_line.pallet_ids[0]
-            wcs_order = self.env['shipment_order.move'].create({'location_id': move_line.inbound_from.id,
-                                                    'location_dest_id': move_line.location_dest_id.id,
-                                                    'wcs_state_1': 'pending',
-                                                    'wcs_pickup_1': move_line.inbound_from.name,
-                                                    'wcs_dropoff_1':  move_line.location_dest_id.name,
-                                                    'wcs_timestamp': datetime.today(),
-                                                    'pallet_id': pallet.id,
-                                                    'picking_id': move_line.picking_id.id,
-                                                    'move_line_id': move_line.id,
-                                                    'qr_code': pallet.qr_code_data})
-            self._send_wcs_order(move_line.inbound_from.name, move_line.location_dest_id.name,move_line.pallet_ids.name,
-                                  wcs_order,1,False)
-            self.WIZARD_WCS_ORDER_IDS.append(wcs_order.id)
-            print("WCS ORDER: " + str(wcs_order))
-        else:
-            transport_order_list = []
-            order_sequence = 1
-            for move_line in self.move_line_ids:
-                pallet = move_line.pallet_ids
-                if move_line.is_wcs_order:
-                    
-                    #1. For all racks: send to elevated tray open side
-                    #2. For bottom rack: send from elevated tray closed side to rack
-                    #   For top rack: send from elevated tray open side to rack
-                    
-                    #Get available elevated tray (open side)
-                    """ elevated_tray = self.env['shipment_order.elevated.tray'].search(['|',
-                                    ('occupied_state','=','Empty'),
-                                    ('occupied_state','=',False)
-                                    ],order='pallet_date', limit=1) """
-                    #Just get 1st tray based on earliest last updated date
-                    elevated_tray = self.env['shipment_order.elevated.tray'].search([],order='pallet_date, priority', limit=1)
-                    if elevated_tray.id == False:
-                        raise exceptions.ValidationError("No available elevated tray for pallet " + pallet.name)
-                    else:
-                        
-                        wcs_order = self.env['shipment_order.move'].create({'location_id': move_line.inbound_from.id,
+            pickup_location_name = move_line.inbound_from.name
+
+            if move_line.is_wcs_order:
+                #check if pickup from elevated tray, change to elevated tray closed side code
+                pickup_elevated_tray = self.env['shipment_order.elevated.tray'].search([('name','=','move_line.inbound_from.name')], limit=1)
+                if pickup_elevated_tray.id:
+                    pickup_location_name = pickup_elevated_tray.closed_side_code
+
+                wcs_order = self.env['shipment_order.move'].create({'location_id': move_line.inbound_from.id,
                                                         'location_dest_id': move_line.location_dest_id.id,
                                                         'wcs_state_1': 'pending',
-                                                        'wcs_pickup_1': move_line.inbound_from.name,
-                                                        'wcs_dropoff_1': elevated_tray.open_side_code,
+                                                        'wcs_pickup_1': pickup_location_name,
+                                                        'wcs_dropoff_1':  move_line.location_dest_id.name,
                                                         'wcs_timestamp': datetime.today(),
                                                         'pallet_id': pallet.id,
                                                         'picking_id': move_line.picking_id.id,
                                                         'move_line_id': move_line.id,
                                                         'qr_code': pallet.qr_code_data})
-                        elevated_tray.write({'occupied_state': 'Reserved',
-                                            'pallet_date': datetime.today()})
-                        #send to elevated tray open side
-                        transport_order_list.append({
-                            'pickup':move_line.inbound_from.name,
-                            'dropoff':elevated_tray.open_side_code,
-                            'pallet_name': pallet.name,
-                            'wcs_order':wcs_order,
-                            'sequence': 1,
-                            'is_elevated_tray': True,
-                            'order_sequence' : order_sequence
-                        })
-                        order_sequence += 1
-                        #self._send_wcs_order(move_line.inbound_from.name, elevated_tray.open_side_code,pallet.name, wcs_order,1)
+                self._send_wcs_order(move_line.inbound_from.name, move_line.location_dest_id.name,move_line.pallet_ids.name,
+                                    wcs_order,1,False)
+                self.WIZARD_WCS_ORDER_IDS.append(wcs_order.id)
+                print("WCS ORDER: " + str(wcs_order))
+            else:
+                move_line.write({'qty_done':1})
+                if move_line.state != 'done':
+                    move_line._action_done()
+                    move_line.write({'state':'confirmed'})
+        else:
+            transport_order_list = []
+            move_line_list = []
+            order_sequence = 1
+            for move_line in self.move_line_ids:
+                move_line_list.append(move_line)
+            #process in order of scanning
+            move_line_list.sort(key=lambda x: (x['id']))
 
-                        
+            for move_line in move_line_list:
+                pallet = move_line.pallet_ids
+                if move_line.is_wcs_order:
+
+                    pickup_location_name = move_line.inbound_from.name
+                    pickup_elevated_tray = self.env['shipment_order.elevated.tray'].search([('name','=',move_line.inbound_from.name)], limit=1)
+                    is_top_rack = 1
+                    
+                    #Send from elevated tray to rack
+                    if pickup_elevated_tray.id:
                         if 'TALL_PALLET' in move_line.product_id.code:
                             #send from elevated tray open side to rack
-                            wcs_order.write({'wcs_state_2': 'pending',
-                                            'wcs_pickup_2': elevated_tray.open_side_code,
-                                            'wcs_dropoff_2': move_line.location_dest_id.name})
-                            
-                            transport_order_list.append({
-                                'pickup':elevated_tray.open_side_code,
+                            pickup_location_name = pickup_elevated_tray.open_side_code
+                            is_top_rack = 0
+                        else: pickup_location_name = pickup_elevated_tray.closed_side_code
+
+                        wcs_order = self.env['shipment_order.move'].create({'location_id': move_line.inbound_from.id,
+                                                            'location_dest_id': move_line.location_dest_id.id,
+                                                            'wcs_state_1': 'pending',
+                                                            'wcs_pickup_1': pickup_location_name,
+                                                            'wcs_dropoff_1': move_line.location_dest_id.name,
+                                                            'wcs_timestamp': datetime.today(),
+                                                            'pallet_id': pallet.id,
+                                                            'picking_id': move_line.picking_id.id,
+                                                            'move_line_id': move_line.id,
+                                                            'qr_code': pallet.qr_code_data})
+                        transport_order_list.append({
+                                'pickup': pickup_location_name,
                                 'dropoff':move_line.location_dest_id.name,
                                 'pallet_name': pallet.name,
                                 'wcs_order':wcs_order,
-                                'sequence': 2,
+                                'sequence': 1,
                                 'is_elevated_tray': False,
+                                'is_top_rack': is_top_rack,
                                 'order_sequence' : order_sequence
                             })
-                            order_sequence += 1
-                            #self._send_wcs_order(elevated_tray.open_side_code, move_line.location_dest_id.name,pallet.name, wcs_order,2)
-                        else:
-                            #send from elevated tray closed side to rack
-                            wcs_order.write({'wcs_state_2': 'pending',
-                                            'wcs_pickup_2': elevated_tray.closed_side_code,
-                                            'wcs_dropoff_2': move_line.location_dest_id.name})
-                            
-                            transport_order_list.append({
-                                'pickup':elevated_tray.closed_side_code,
-                                'dropoff':move_line.location_dest_id.name,
-                                'pallet_name': pallet.name,
-                                'wcs_order':wcs_order,
-                                'sequence': 2,
-                                'is_elevated_tray': False,
-                                'order_sequence' : order_sequence
-                            })
-                            order_sequence += 1
-                            #self._send_wcs_order(elevated_tray.closed_side_code, move_line.location_dest_id.name,pallet.name, wcs_order,2)
+                        order_sequence += 1
+                        
+                        self.WIZARD_WCS_ORDER_IDS.append(wcs_order.id)
+                        print("WCS ORDER: " + str(wcs_order))
+                        
+                    #Send from lift to rack
+                    else:
+                        #1. For all racks: send to elevated tray open side
+                        #2. For bottom rack: send from elevated tray closed side to rack
+                        #   For top rack: send from elevated tray open side to rack
                     
+                        #Just get 1st tray based on earliest last updated date
+                        elevated_tray = self.env['shipment_order.elevated.tray'].search([],order='pallet_date, priority', limit=1)
+                        if elevated_tray.id == False:
+                            raise exceptions.ValidationError("No available elevated tray for pallet " + pallet.name)
+                        else:
+                            wcs_order = self.env['shipment_order.move'].create({'location_id': move_line.inbound_from.id,
+                                                            'location_dest_id': move_line.location_dest_id.id,
+                                                            'wcs_state_1': 'pending',
+                                                            'wcs_pickup_1': move_line.inbound_from.name,
+                                                            'wcs_dropoff_1': elevated_tray.open_side_code,
+                                                            'wcs_timestamp': datetime.today(),
+                                                            'pallet_id': pallet.id,
+                                                            'picking_id': move_line.picking_id.id,
+                                                            'move_line_id': move_line.id,
+                                                            'qr_code': pallet.qr_code_data})
+                            elevated_tray.write({'occupied_state': 'Reserved',
+                                                'pallet_date': datetime.today()})
+                            #send to elevated tray open side
+                            transport_order_list.append({
+                                'pickup':move_line.inbound_from.name,
+                                'dropoff':elevated_tray.open_side_code,
+                                'pallet_name': pallet.name,
+                                'wcs_order':wcs_order,
+                                'sequence': 1,
+                                'is_elevated_tray': True,
+                                'is_top_rack': 0,
+                                'order_sequence' : order_sequence
+                            })
+                            order_sequence += 1
+                            #self._send_wcs_order(move_line.inbound_from.name, elevated_tray.open_side_code,pallet.name, wcs_order,1)
+
+                            
+                            if 'TALL_PALLET' in move_line.product_id.code:
+                                #send from elevated tray open side to rack
+                                wcs_order.write({'wcs_state_2': 'pending',
+                                                'wcs_pickup_2': elevated_tray.open_side_code,
+                                                'wcs_dropoff_2': move_line.location_dest_id.name})
+                                
+                                transport_order_list.append({
+                                    'pickup':elevated_tray.open_side_code,
+                                    'dropoff':move_line.location_dest_id.name,
+                                    'pallet_name': pallet.name,
+                                    'wcs_order':wcs_order,
+                                    'sequence': 2,
+                                    'is_elevated_tray': False,
+                                    'is_top_rack': 0,
+                                    'order_sequence' : order_sequence
+                                })
+                                order_sequence += 1
+                                #self._send_wcs_order(elevated_tray.open_side_code, move_line.location_dest_id.name,pallet.name, wcs_order,2)
+                            else:
+                                #send from elevated tray closed side to rack
+                                wcs_order.write({'wcs_state_2': 'pending',
+                                                'wcs_pickup_2': elevated_tray.closed_side_code,
+                                                'wcs_dropoff_2': move_line.location_dest_id.name})
+                                
+                                transport_order_list.append({
+                                    'pickup':elevated_tray.closed_side_code,
+                                    'dropoff':move_line.location_dest_id.name,
+                                    'pallet_name': pallet.name,
+                                    'wcs_order':wcs_order,
+                                    'sequence': 2,
+                                    'is_elevated_tray': False,
+                                    'is_top_rack': 1,
+                                    'order_sequence' : order_sequence
+                                })
+                                order_sequence += 1
+                                #self._send_wcs_order(elevated_tray.closed_side_code, move_line.location_dest_id.name,pallet.name, wcs_order,2)
+                        
                         
                         self.WIZARD_WCS_ORDER_IDS.append(wcs_order.id)
                         print("WCS ORDER: " + str(wcs_order))
@@ -669,7 +757,8 @@ class ShipmentWizard(models.TransientModel):
 
             non_elevated_tray_orders = [x for x in transport_order_list if x['is_elevated_tray'] == False]
             if non_elevated_tray_orders:
-                non_elevated_tray_orders.sort(key=lambda x: (x['order_sequence']))
+                #place top rack pallets first
+                non_elevated_tray_orders.sort(key=lambda x: (x['is_top_rack']),reverse=True) 
 
             for to in elevated_tray_orders:
                 self._send_wcs_order(to['pickup'], to['dropoff'],to['pallet_name'], to['wcs_order'],to['sequence'],to['is_elevated_tray'])
@@ -749,68 +838,94 @@ class ShipmentWizard(models.TransientModel):
         is_tall_pallet = False
         if(pallet_id.cargo_height > max_height):
             is_tall_pallet = True
-        #container exists, use existing lane
+
+        rack_tag_category = self.env['generic.tag.category'].search([
+                                ('code', '=', 'rack'),
+                                ], limit=1)
+        
+        if not rack_tag_category.id:
+            raise exceptions.ValidationError("No location tag with category 'rack' has been created")
+        
+        stock_quant_list = self.env['stock.quant'].search([
+                            ('quantity', '>', 0),
+                            ])
+        
+        move_line_list = self.env['stock.move.line'].search([
+                            ('reserved_qty', '>', 0),
+                            ('state', '=', 'assigned'),
+                            ])
+        
+        #container exists, use existing rack based on last added pallet
         if container_id.id and not is_newly_created_container:
             pallet_obj = self.env['shipment_order.pallet'].search([
                                 ('container_id', '=', container_id.id),
                                 ('id', '!=', pallet_id.id)
-                                ], limit=1) 
-            move_line_obj = self.env['stock.move.line'].browse(pallet_obj.move_line_id.id) 
-            product_code = move_line_obj.product_id.product_tmpl_id.categ_id.name + '_' + ('TALL_PALLET' if is_tall_pallet else 'SHORT_PALLET')
-            product_obj = self.env['product.product'].search([
-                                ('default_code', '=', product_code),
-                                ], limit=1)
-            if not product_obj.id:
-                raise exceptions.ValidationError("Cannot find product with code: " + product_code)
-            return product_obj
-        else:
-        #find new lane for container
-            
-            rack_tag_category = self.env['generic.tag.category'].search([
-                                ('code', '=', 'rack'),
-                                ], limit=1)
-            if not rack_tag_category.id:
-                raise exceptions.ValidationError("No location tag with category 'rack' has been created")
-            
-            #find locations with stock
-            stock_quant_list = self.env['stock.quant'].search([
-                                ('quantity', '>', 0),
-                                ])
-            rack_tags_with_qty = []
-            for quant in stock_quant_list:
-                location_rack_tag = quant.location_id.generic_tag_ids.filtered(lambda x: x.category_id.id == rack_tag_category.id)
-                if len(location_rack_tag) > 0:
-                    if location_rack_tag[0].id not in rack_tags_with_qty:
-                        rack_tags_with_qty.append(location_rack_tag.id)
+                                ], limit=1, order="id desc") 
+            move_line_obj = self.env['stock.move.line'].browse(pallet_obj.move_line_id.id)
 
-            #find all stock in pending move lines
-            move_line_list = self.env['stock.move.line'].search([
-                                ('reserved_qty', '>', 0),
-                                ('state', '=', 'assigned'),
-                                ])
+            #check if rack is full, no locations under this rack tag category with 0 stock
+            location_dest = move_line_obj.location_dest_id
+            rack_tag = location_dest.generic_tag_ids.filtered(lambda x: x.category_id.id == rack_tag_category.id)
+            #total number of locations in this rack
+            total_locations_count = rack_tag.objects_count
+            #find all locations in this rack that are occupied
+            locations_with_qty = []
+            for quant in stock_quant_list:
+                location_rack_tag = quant.location_id.generic_tag_ids.filtered(lambda x: x.id == rack_tag.id)
+                if len(location_rack_tag) > 0:
+                    if quant.location_id.id not in locations_with_qty:
+                        locations_with_qty.append(quant.location_id.id)
+            #add on locations for movements that are not yet completed
             for move_line in move_line_list:
                 tags = move_line.location_dest_id.generic_tag_ids
-                location_rack_tag = tags.filtered(lambda x: x.category_id.id == rack_tag_category.id)
+                location_rack_tag = tags.filtered(lambda x: x.id == rack_tag.id)
                 if len(location_rack_tag) > 0:
-                    if location_rack_tag[0].id not in rack_tags_with_qty:
-                        rack_tags_with_qty.append(location_rack_tag.id)
+                    if move_line.location_dest_id.id not in locations_with_qty:
+                        locations_with_qty.append(move_line.location_dest_id.id)
+            
+            if len(locations_with_qty) < total_locations_count:
+                #there are still available locations in this rack
+                product_code = move_line_obj.product_id.product_tmpl_id.categ_id.name + '_' + ('TALL_PALLET' if is_tall_pallet else 'SHORT_PALLET')
+                product_obj = self.env['product.product'].search([
+                                    ('default_code', '=', product_code),
+                                    ], limit=1)
+                if not product_obj.id:
+                    raise exceptions.ValidationError("Cannot find product with code: " + product_code)
+                return product_obj
+        
+        #find new lane for container
+        #find locations with stock
+        rack_tags_with_qty = []
+        for quant in stock_quant_list:
+            location_rack_tag = quant.location_id.generic_tag_ids.filtered(lambda x: x.category_id.id == rack_tag_category.id)
+            if len(location_rack_tag) > 0:
+                if location_rack_tag[0].id not in rack_tags_with_qty:
+                    rack_tags_with_qty.append(location_rack_tag.id)
 
-            #Find locations tagged with category = 'rack' and not having any stock 
-            next_available_rack_tag = self.env['generic.tag'].search([
-                                ('category_id', '=', rack_tag_category.id),
-                                ('id', 'not in', rack_tags_with_qty),
-                                ], order="sequence", limit=1)
-            
-            if not next_available_rack_tag.id:
-                raise exceptions.ValidationError("No available racks, all racks are occupied")
-            product_code = next_available_rack_tag.code + '_' + ('TALL_PALLET' if is_tall_pallet else 'SHORT_PALLET')
-            product_obj = self.env['product.product'].search([
-                                ('default_code', '=', product_code),
-                                ], limit=1)
-            
-            if not product_obj.id:
-                raise exceptions.ValidationError("Cannot find product with code: " + product_code)
-            return product_obj
+        #find all stock in pending move lines
+        for move_line in move_line_list:
+            tags = move_line.location_dest_id.generic_tag_ids
+            location_rack_tag = tags.filtered(lambda x: x.category_id.id == rack_tag_category.id)
+            if len(location_rack_tag) > 0:
+                if location_rack_tag[0].id not in rack_tags_with_qty:
+                    rack_tags_with_qty.append(location_rack_tag.id) #now we have a complete list of all racks that are occupied
+        
+        #Find locations tagged with category = 'rack' and not having any stock 
+        next_available_rack_tag = self.env['generic.tag'].search([
+                            ('category_id', '=', rack_tag_category.id),
+                            ('id', 'not in', rack_tags_with_qty),
+                            ], order="sequence", limit=1)
+        
+        if not next_available_rack_tag.id:
+            raise exceptions.ValidationError("No available racks, all racks are occupied")
+        product_code = next_available_rack_tag.code + '_' + ('TALL_PALLET' if is_tall_pallet else 'SHORT_PALLET')
+        product_obj = self.env['product.product'].search([
+                            ('default_code', '=', product_code),
+                            ], limit=1)
+        
+        if not product_obj.id:
+            raise exceptions.ValidationError("Cannot find product with code: " + product_code)
+        return product_obj
             
     def _create_move_line(self, pallet_id, picking_id, is_newly_created_container, container_id, is_wcs_order, pickup_location):
         product_obj = self._get_product(pallet_id, is_newly_created_container, container_id)
@@ -835,10 +950,7 @@ class ShipmentWizard(models.TransientModel):
                                         'ref':picking_id.ref_number})
         move_line_obj = self.env['stock.move.line']
 
-        #INBOUND
-        if picking_id.picking_type_id.id == 1:
-            
-            new_move_line = move_line_obj.create({'picking_id': picking_id.id,
+        new_move_line = move_line_obj.create({'picking_id': picking_id.id,
                                     'company_id': self.company_id.id,
                                     'product_id': product_obj.id,
                                     'product_uom_id': product_obj.uom_id.id,
@@ -852,47 +964,23 @@ class ShipmentWizard(models.TransientModel):
                                     'is_wcs_order': is_wcs_order,
                                     'pallet_id': pallet_id.id,
                                     'inbound_from': pickup_location.id})
-            pallet_id.write({'move_line_id':new_move_line.id})
-        else: #OUTBOUND
-            new_move_line = message, recommended_location = self.env['stock.quant'].sudo()._check_serial_number(product_obj,
-                                                                                        new_lot,
-                                                                                        self.company_id,
-                                                                                        picking_id.location_id,
-                                                                                        picking_id.location_id)
-            if message:
-                raise exceptions.ValidationError(message)
-            else: move_line_obj.create({'picking_id': picking_id.id,
-                                    'company_id': self.company_id.id,
-                                    'product_id': product_obj.id,
-                                    'product_uom_id': product_obj.uom_id.id,
-                                    'lot_id': new_lot.id,
-                                    'location_id': recommended_location.id if recommended_location else picking_id.location_id.id,
-                                    'location_dest_id': location.id,
-                                    'reference': picking_id.name,
-                                    #'reserved_uom_qty': 0,
-                                    'qty_done': 1,
-                                    'is_wcs_order': True,
-                                    'pallet_id': pallet_id.id,
-                                    'inbound_from': None})
+        pallet_id.write({'move_line_id':new_move_line.id})
+
                 
         if picking_id.state == 'draft':
             picking_id.action_assign()
         
         if new_move_line.id:
+            new_move_line.move_id.write({'date':picking_id.eta})
             self.WIZARD_MOVE_LINE_IDS.append(new_move_line._origin.id)
             self.WIZARD_MOVE_LINES.append(new_move_line)
 
-        """ if new_move_line.id:
-            #If move line is added to a picking with done state, it's state is automatically set to done, do not repeat
-            if new_move_line.state != 'done':
-                new_move_line._action_done() """
-        
         return new_move_line
                     
 
     def _get_default_locations(self, partner):
 
-        picking_type_id = 1 if self.shipment_type == 'I' else 2
+        picking_type_id = 1 
         picking_type = self.env['stock.picking.type'].browse(picking_type_id)
         if picking_type.default_location_src_id:
             location_id = picking_type.default_location_src_id.id

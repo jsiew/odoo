@@ -22,7 +22,7 @@ class StockLocation(models.Model):
         location = self.browse(id)
         stock_quants = []
         for stock_quant in self.env["stock.quant"].search(
-            [("location_id", "=", location.id)]
+            [("location_id", "=", location.id),("quantity","=",1)]
         ):
             booking_num = ""
             container_num = ""

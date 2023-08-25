@@ -15,7 +15,6 @@ class ShipmentOutScan(models.TransientModel):
     height = fields.Integer('Height')
     pallet_id = fields.Char('Pallet ID')
 
-    process_pallet = fields.Boolean('Process', default=True)
     is_wcs_order = fields.Boolean('Create WCS Order', default=True)
 
     shipment_out_id = fields.Many2one('shipment_order.scan.out',ondelete='cascade')
@@ -37,13 +36,21 @@ class ShipmentOutboundWizard(models.TransientModel):
     WIZARD_WCS_ORDER_IDS = []
     WIZARD_CONTAINER_IDS = []
 
+    
+    customer = fields.Many2one('res.company',string='Customer')
+    shipment_month = fields.Selection([('1', 'January'), ('2', 'February'), ('3', 'March'), ('4', 'April'),
+                            ('5', 'May'), ('6', 'June'), ('7', 'July'), ('8', 'August'), 
+                            ('9', 'September'), ('10', 'October'), ('11', 'November'), ('12', 'December')], 
+                            string='Shipment Month', default=str(date.today().month))
+    shipment_week = fields.Selection([('0','0'),('1','1'),('2','2'),('3','3'),('4','4'),('5','5')], default = str((date.today().day - 1 + (date.today().weekday() - date.today().day + 1) % 7)//7+1))
+    container_id = fields.Many2one('shipment_order.container',string='Container')
+
+
     ref_number = fields.Char(string="Booking/BL No.") 
-    customer = fields.Char(string="Customer")
     vessel_name = fields.Char(string="Vessel Name")
     voyage_number = fields.Char(string="Voyage No.")
     eta = fields.Date(string="ETA",default=date.today())
-
-    container_id = fields.Many2one('shipment_order.container',string='Container')
+    
     container_number_actual = fields.Char(string='Actual Container', related='container_id.container_number_actual')
     pallet_ids = fields.One2many('shipment_order.scan.line.out', 'shipment_out_id', string="Pallets")
     wcs_order_ids = fields.One2many('shipment_order.move', compute='_compute_wcs_orders', inverse='_inverse_wcs_orders', string="WCS Orders")
@@ -60,15 +67,17 @@ class ShipmentOutboundWizard(models.TransientModel):
         result = super(ShipmentOutboundWizard, self).default_get(fields)  
         return result   
 
+
     @api.model
     def _selection_state(self):
         return [
-            ('start', 'Search Booking No. & Container'),
+            ('start', 'Search for Pallets'),
             ('final', 'WCS Transport Orders'),
         ]
     
     def state_exit_start(self):
         self.state = "final"
+        self.name = "Retrieve Booking"
         self.action_process_pallets()
     
     def _inverse_move_lines(self):
@@ -76,6 +85,7 @@ class ShipmentOutboundWizard(models.TransientModel):
     
     def _inverse_wcs_orders(self):
         return
+    
     
     @api.depends('pallet_ids')
     def _compute_move_lines(self):
@@ -97,72 +107,96 @@ class ShipmentOutboundWizard(models.TransientModel):
         self.container_id = container_obj.search([
                                 ('ref_number', '=ilike', self.ref_number)
                                 ])
-    @api.onchange('ref_number')
+    @api.onchange('customer','shipment_month','shipment_week')
+    def _onchange_fields(self):
+        for rec in self:
+            pickings = self.env['stock.picking'].search([
+                                ('partner_id','=',rec.customer.partner_id.id),
+                                ('shipment_month','=',rec.shipment_month),
+                                ('shipment_week','=',rec.shipment_week),
+                             ]) 
+            containers = []
+            if len(pickings) != 0:
+                for picking in pickings:
+                    for container in picking.container_ids:
+                        containers.append(container.id)
+            return {'domain': {'container_id': [('id', 'in', containers)]}}
+            #return {'domain': {'container_id': [('ref_number', '=ilike', rec.ref_number)]}}
+        
+    """ @api.onchange('ref_number')
     def _onchange_ref_number(self):
         for rec in self:
-            return {'domain': {'container_id': [('ref_number', '=ilike', rec.ref_number)]}}
+            return {'domain': {'container_id': [('ref_number', '=ilike', rec.ref_number)]}} """
     
     @api.onchange('container_id')
     def _onchange_container_id(self):
-        for existing_pallet in self.pallet_ids:
-            existing_pallet.unlink()
-        pallet_obj = self.env['shipment_order.pallet']
-        pallet_list = pallet_obj.search([
-                            ('container_id', '=', self.container_id.id)
-                            ])
-        location_drop_list = []
-        out_of_space_pallets = 0
-        total_pallets = 0
 
-        # CHECK FOR EXISTING PICKING
-        picking_obj = self.env['stock.picking']
-        existing_picking = picking_obj.search([
-                                ('ref_number', '=', self.ref_number),
-                                ('picking_type_id', '=', 2)
-                                ], limit=1)
-        if existing_picking.id:
-            existing_pallets = []
-            for moveline in existing_picking.move_line_ids:
-                existing_pallets.append(moveline.pallet_id)
-            pallet_list = list(filter(lambda x: x not in existing_pallets, pallet_list))
+        for rec in self:
+            for existing_pallet in rec.pallet_ids:
+                existing_pallet.unlink()
+            pallet_obj = self.env['shipment_order.pallet']
+            pallet_list = pallet_obj.search([
+                                ('container_id', '=', rec.container_id.id)
+                                ])
+            location_drop_list = []
+            out_of_space_pallets = 0
+            total_pallets = 0
+            rec.ref_number = rec.container_id.ref_number
 
-        for pallet in pallet_list:
-            lot_id = self.env['stock.lot'].search([
-                            ('name', '=', pallet.name)
-                            ],limit=1)
-            if lot_id.id:
-                quant_id = self.env['stock.quant'].search([
-                            ('lot_id', '=', lot_id.id),
-                            ('quantity', '=', 1),
-                            ('reserved_quantity', '=', 0),
-                            ('location_id.usage', '!=', 'customer')
-                            ],limit=1)
-                if quant_id.id:
-                    total_pallets += 1
-                    location_id = self.env['stock.location'].browse(quant_id.location_id)
-                    location_drop_id = self.env['shipment_order.staging.state'].search([
-                                                        ('pallet_id', '=', None),
-                                                        ('location_id', 'not in', location_drop_list),
-                                                        ],limit=1,order='staging_sequence')
+            # CHECK FOR EXISTING PICKING
+            picking_obj = self.env['stock.picking']
+            existing_picking = picking_obj.search([
+                                    ('ref_number', '=', rec.ref_number),
+                                    ('picking_type_id', '=', 2)
+                                    ], limit=1)
+            if existing_picking.id:
+                existing_pallets = []
+                for moveline in existing_picking.move_line_ids:
+                    existing_pallets.append(moveline.pallet_id)
+                pallet_list = list(filter(lambda x: x not in existing_pallets, pallet_list))
+            
+            pallets = []
+            for pallet in pallet_list:
+                pallets.append(pallet)
+            pallets.sort(key=(lambda x: x.id),reverse=True)
+
+            for pallet in pallets:
+                lot_id = self.env['stock.lot'].search([
+                                ('name', '=', pallet.name)
+                                ],limit=1, order="id desc")
+                if lot_id.id:
+                    quant_id = self.env['stock.quant'].search([
+                                ('lot_id', '=', lot_id.id),
+                                ('quantity', '=', 1),
+                                ('reserved_quantity', '=', 0),
+                                ('location_id.usage', '!=', 'customer')
+                                ],limit=1)
+                    if quant_id.id:
+                        total_pallets += 1
+                        location_id = self.env['stock.location'].browse(quant_id.location_id)
+                        location_drop_id = self.env['shipment_order.staging.state'].search([
+                                                            ('pallet_id', '=', None),
+                                                            ('location_id', 'not in', location_drop_list),
+                                                            ],limit=1,order='staging_sequence')
+                        
+                        if location_drop_id.id:
+                            location_drop_list.append(location_drop_id.location_id.id)
+                            self.env['shipment_order.scan.line.out'].create({
+                                                                        'pallet_id' : pallet.name,
+                                                                        'length' : pallet.cargo_length,
+                                                                        'width' : pallet.cargo_width,
+                                                                        'height' : pallet.cargo_height,
+                                                                        'pickup_location': location_id.id.id,
+                                                                        'drop_off_location': location_drop_id.location_id.id,
+                                                                        'shipment_out_id': self.id,
+                                                                        'pickup_is_bottom_rack': True if 'Bottom' in location_id.id.slot_tag_id.category_name else False,
+                                                                        'pickup_slot_tag_sequence': location_id.id.slot_tag_id.sequence,})
+                        else: out_of_space_pallets += 1
+            if out_of_space_pallets > 0:
+                msg = "Booking No.: " + rec.ref_number + ", Container: " +rec.container_id.container_number + ". \r\n"
+                msg += str(out_of_space_pallets) + '/' + str(total_pallets) +' pallets not processed'
+                self.env.user.notify_warning(message=msg,title="Staging Area Full", sticky=True)
                     
-                    if location_drop_id.id:
-                        location_drop_list.append(location_drop_id.location_id.id)
-                        self.env['shipment_order.scan.line.out'].create({
-                                                                    'pallet_id' : pallet.name,
-                                                                    'length' : pallet.cargo_length,
-                                                                    'width' : pallet.cargo_width,
-                                                                    'height' : pallet.cargo_height,
-                                                                    'pickup_location': location_id.id.id,
-                                                                    'drop_off_location': location_drop_id.location_id.id,
-                                                                    'shipment_out_id': self.id,
-                                                                    'pickup_is_bottom_rack': True if 'Bottom' in location_id.id.slot_tag_id.category_name else False,
-                                                                    'pickup_slot_tag_sequence': location_id.id.slot_tag_id.sequence,})
-                    else: out_of_space_pallets += 1
-        if out_of_space_pallets > 0:
-            msg = "Booking No.: " + self.ref_number + ", Container: " +self.container_id.container_number + ". \r\n"
-            msg += str(out_of_space_pallets) + '/' + str(total_pallets) +' pallets not processed'
-            self.env.user.notify_warning(message=msg,title="Staging Area Full", sticky=True)
-                
     def _populate_staging(self):
         # Get locations with staging tag
         staging_category = self.env['generic.tag.category'].search([('code', '=', 'stgout'),])
@@ -179,7 +213,7 @@ class ShipmentOutboundWizard(models.TransientModel):
                     self.env['shipment_order.staging.state'].create({
                                                             'location_id' : staging.id,
                                                             'staging_sequence' : staging_tag.sequence})  
-    
+
     def _get_default_locations(self, partner):
 
         picking_type = self.env['stock.picking.type'].browse(2)
@@ -209,7 +243,7 @@ class ShipmentOutboundWizard(models.TransientModel):
                                 ], limit=1)
         
         incoming_picking = picking_obj.search([
-                            ('ref_number', '=ilike', self.ref_number),
+                            ('ref_number', '=ilike', self.container_id.ref_number),
                             ('picking_type_id', '=', 1)
                             ], limit=1)
         if incoming_picking.id == False:
@@ -224,7 +258,7 @@ class ShipmentOutboundWizard(models.TransientModel):
                                 'partner_id': incoming_picking.partner_id.id,
                                 'location_id':picking_pickup_location,
                                 'location_dest_id':picking_dropoff_location,
-                                'ref_number': self.ref_number,
+                                'ref_number': self.container_id.ref_number,
                                 'vessel_name': incoming_picking.vessel_name,
                                 'voyage_number': incoming_picking.voyage_number,
                                 'eta': incoming_picking.eta,
@@ -243,8 +277,7 @@ class ShipmentOutboundWizard(models.TransientModel):
         # GET PALLETS TO PROCESS
         pallet_names = []
         for pallet in self.pallet_ids:
-            if pallet.process_pallet:
-                pallet_names.append(pallet.pallet_id)
+            pallet_names.append(pallet.pallet_id)
         
         #CREATE MOVE LINES ONLY FOR PALLETS TO BE PROCESSED
         #SORT FROM BOTTOM TO TOP RACK, OUTERMOST TO INNERMOST SLOT
@@ -276,7 +309,7 @@ class ShipmentOutboundWizard(models.TransientModel):
                                                             'picking_id': existing_picking.id,
                                                             'move_line_id': move_line.id,
                                                             'qr_code': outbound_pallet.qr_code_data})
-                    self._send_wcs_order(wizard_pallet.pickup_location.name, wizard_pallet.drop_off_location.name,outbound_pallet.id, wcs_order, 1)
+                    self._send_wcs_order(wizard_pallet.pickup_location.name, wizard_pallet.drop_off_location.name,outbound_pallet.id, wcs_order, 1, False)
                 else:
                     #Get available elevated tray (closed side)
                     elevated_tray = self.env['shipment_order.elevated.tray'].search([],order='pallet_date, priority', limit=1)
@@ -298,8 +331,8 @@ class ShipmentOutboundWizard(models.TransientModel):
                                                             'picking_id': existing_picking.id,
                                                             'move_line_id': move_line.id,
                                                             'qr_code': outbound_pallet.qr_code_data})
-                    self._send_wcs_order(wizard_pallet.pickup_location.name, elevated_tray.closed_side_code,outbound_pallet.id, wcs_order, 1)
-                    self._send_wcs_order(elevated_tray.open_side_code,  wizard_pallet.drop_off_location.name,outbound_pallet.id, wcs_order, 2)
+                    self._send_wcs_order(wizard_pallet.pickup_location.name, elevated_tray.closed_side_code,outbound_pallet.id, wcs_order, 1, True)
+                    self._send_wcs_order(elevated_tray.open_side_code,  wizard_pallet.drop_off_location.name,outbound_pallet.id, wcs_order, 2, False)
                     
                 self.WIZARD_WCS_ORDER_IDS.append(wcs_order.id)
                 print("WCS ORDER: " + str(wcs_order))
@@ -318,10 +351,12 @@ class ShipmentOutboundWizard(models.TransientModel):
             self.WIZARD_MOVE_LINES.append(move_line)
         self.recompute_wcs_order_ids = not(self.recompute_wcs_order_ids)
 
-    def _send_wcs_order(self, pickup_name, delivery_name, payload, wcs_order, sequence_no):
+    def _send_wcs_order(self, pickup_name, delivery_name, payload, wcs_order, sequence_no, is_elevated_tray):
         wms_interface_url = self.env['ir.config_parameter'].sudo().get_param('shipment_order.wms_interface_url')
         wcs_system_name = self.env['ir.config_parameter'].sudo().get_param('shipment_order.wcs_system_name')
         wcs_subsystem_id = int(self.env['ir.config_parameter'].sudo().get_param('shipment_order.wcs_subsystem_id'))
+        validate_elevated_tray_qr = bool(self.env['ir.config_parameter'].sudo().get_param('shipment_order.validate_elevated_tray_qr'))
+        validate_qr = bool(self.env['ir.config_parameter'].sudo().get_param('shipment_order.validate_qr'))
 
         data = {
             "system": wcs_system_name,
@@ -329,6 +364,7 @@ class ShipmentOutboundWizard(models.TransientModel):
             "priority": 5,
             "pickup": pickup_name,
             "delivery": delivery_name,
+            "scan": validate_elevated_tray_qr if is_elevated_tray else validate_qr, #indicate if WCS should scan the pallet qr code when picking up the pallet
             "payload": payload
         }
         try:

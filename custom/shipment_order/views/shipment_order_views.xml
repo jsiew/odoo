@@ -115,7 +115,7 @@
                                 decoration-danger="wcs_message_type == 'error'"
                                 widget="badge"/>
                             <field name="remarks"/>
-                            <field name="wcs_message"/>
+                            <field name="wcs_message" class="w250"/>
                             <field name="wcs_id"/>
                             <field name="wcs_message_code"/>
                             <field name="wcs_notification_code"/>
