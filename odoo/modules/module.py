@@ -82,6 +82,13 @@ class AddonsHook(object):
                 DeprecationWarning, stacklevel=2)
             return self
 
+    def find_spec(self, fullname, path=None, target=None):
+        if fullname.startswith('openerp.addons.') and fullname.count('.') == 2:
+            warnings.warn(
+                '"openerp.addons" is a deprecated alias to "odoo.addons".',
+                DeprecationWarning, stacklevel=2)
+            return importlib.util.spec_from_loader(fullname, self)
+
     def load_module(self, name):
         assert name not in sys.modules
 
@@ -106,6 +113,15 @@ class OdooHook(object):
                 'openerp is a deprecated alias to odoo.',
                 DeprecationWarning, stacklevel=2)
             return self
+
+    def find_spec(self, fullname, path=None, target=None):
+        # openerp.addons.<identifier> should already be matched by AddonsHook,
+        # only framework and subdirectories of modules should match
+        if re.match(r'^openerp\b', fullname):
+            warnings.warn(
+                'openerp is a deprecated alias to odoo.',
+                DeprecationWarning, stacklevel=2)
+            return importlib.util.spec_from_loader(fullname, self)
 
     def load_module(self, name):
         assert name not in sys.modules
@@ -136,6 +152,14 @@ class UpgradeHook(object):
             # the tests, and the common files (utility functions) still needs to import from the
             # legacy name.
             return self
+
+    def find_spec(self, fullname, path=None, target=None):
+        if re.match(r"^odoo.addons.base.maintenance.migrations\b", fullname):
+            # We can't trigger a DeprecationWarning in this case.
+            # In order to be cross-versions, the multi-versions upgrade scripts (0.0.0 scripts),
+            # the tests, and the common files (utility functions) still needs to import from the
+            # legacy name.
+            return importlib.util.spec_from_loader(fullname, self)
 
     def load_module(self, name):
         assert name not in sys.modules
@@ -178,7 +202,7 @@ def initialize_sys_path():
     legacy_upgrade_path = os.path.join(base_path, 'base', 'maintenance', 'migrations')
     for up in (tools.config['upgrade_path'] or legacy_upgrade_path).split(','):
         up = os.path.normcase(os.path.abspath(tools.ustr(up.strip())))
-        if up not in upgrade.__path__:
+        if os.path.isdir(up) and up not in upgrade.__path__:
             upgrade.__path__.append(up)
 
     # create decrecated module alias from odoo.addons.base.maintenance.migrations to odoo.upgrade
@@ -290,7 +314,8 @@ def get_resource_from_path(path):
     :return: tuple(module_name, relative_path, os_relative_path) if possible, else None
     """
     resource = False
-    for adpath in odoo.addons.__path__:
+    sorted_paths = sorted(odoo.addons.__path__, key=len, reverse=True)
+    for adpath in sorted_paths:
         # force trailing separator
         adpath = os.path.join(adpath, "")
         if os.path.commonprefix([adpath, path]) == adpath:
@@ -310,6 +335,13 @@ def get_module_icon(module):
     if get_module_resource(module, *iconpath):
         return ('/' + module + '/') + '/'.join(iconpath)
     return '/base/'  + '/'.join(iconpath)
+
+def get_module_icon_path(module):
+    iconpath = ['static', 'description', 'icon.png']
+    path = get_module_resource(module.name, *iconpath)
+    if not path:
+        path = get_module_resource('base', *iconpath)
+    return path
 
 def module_manifest(path):
     """Returns path to module manifest if one can be found under `path`, else `None`."""
@@ -492,3 +524,36 @@ def adapt_version(version):
     return version
 
 current_test = None
+
+
+def check_python_external_dependency(pydep):
+    try:
+        pkg_resources.get_distribution(pydep)
+    except pkg_resources.DistributionNotFound as e:
+        try:
+            importlib.import_module(pydep)
+            _logger.info("python external dependency on '%s' does not appear to be a valid PyPI package. Using a PyPI package name is recommended.", pydep)
+        except ImportError:
+            # backward compatibility attempt failed
+            _logger.warning("DistributionNotFound: %s", e)
+            raise Exception('Python library not installed: %s' % (pydep,))
+    except pkg_resources.VersionConflict as e:
+        _logger.warning("VersionConflict: %s", e)
+        raise Exception('Python library version conflict: %s' % (pydep,))
+    except Exception as e:
+        _logger.warning("get_distribution(%s) failed: %s", pydep, e)
+        raise Exception('Error finding python library %s' % (pydep,))
+
+
+def check_manifest_dependencies(manifest):
+    depends = manifest.get('external_dependencies')
+    if not depends:
+        return
+    for pydep in depends.get('python', []):
+        check_python_external_dependency(pydep)
+
+    for binary in depends.get('bin', []):
+        try:
+            tools.find_in_path(binary)
+        except IOError:
+            raise Exception('Unable to find %r in path' % (binary,))

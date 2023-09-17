@@ -5,6 +5,7 @@ import json
 from odoo import api, fields, models, _
 from odoo.tools import float_compare, float_round, format_date, float_is_zero
 from datetime import timedelta
+from collections import defaultdict
 
 class ReportBomStructure(models.AbstractModel):
     _name = 'report.mrp.report_bom_structure'
@@ -23,11 +24,14 @@ class ReportBomStructure(models.AbstractModel):
     @api.model
     def _compute_current_production_capacity(self, bom_data):
         # Get the maximum amount producible product of the selected bom given each component's stock levels.
-        stockable_components = filter(
-            lambda c: c['product'].detailed_type == 'product'
-            and not float_is_zero(c['base_bom_line_qty'], precision_digits=c['uom'].rounding),
-            bom_data.get('components', []))
-        producibles = [float_round(comp['quantity_available'] / comp['base_bom_line_qty'], precision_digits=0, rounding_method='DOWN') for comp in stockable_components]
+        components_qty_to_produce = defaultdict(lambda: 0)
+        components_qty_available = {}
+        for comp in bom_data.get('components', []):
+            if comp['product'].type != 'product' or float_is_zero(comp['base_bom_line_qty'], precision_digits=comp['uom'].rounding):
+                continue
+            components_qty_to_produce[comp['product_id']] += comp['base_bom_line_qty']
+            components_qty_available[comp['product_id']] = comp['quantity_available']
+        producibles = [float_round(components_qty_available[p_id] / qty, precision_digits=0, rounding_method='DOWN') for p_id, qty in components_qty_to_produce.items()]
         return min(producibles) * bom_data['bom']['product_qty'] if producibles else 0
 
     @api.model
@@ -119,6 +123,7 @@ class ReportBomStructure(models.AbstractModel):
             'bom_qty': bom_quantity,
             'is_variant_applied': self.env.user.user_has_groups('product.group_product_variant') and len(bom_product_variants) > 1,
             'is_uom_applied': self.env.user.user_has_groups('uom.group_uom'),
+            'precision': self.env['decimal.precision'].precision_get('Product Unit of Measure'),
         }
 
     @api.model
@@ -346,11 +351,12 @@ class ReportBomStructure(models.AbstractModel):
         company = bom.company_id or self.env.company
         operation_index = 0
         for operation in bom.operation_ids:
-            if operation._skip_operation_line(product):
+            if not product or operation._skip_operation_line(product):
                 continue
             capacity = operation.workcenter_id._get_capacity(product)
             operation_cycle = float_round(qty / capacity, precision_rounding=1, rounding_method='UP')
-            duration_expected = (operation_cycle * operation.time_cycle * 100.0 / operation.workcenter_id.time_efficiency) + (operation.workcenter_id.time_stop + operation.workcenter_id.time_start)
+            duration_expected = (operation_cycle * operation.time_cycle * 100.0 / operation.workcenter_id.time_efficiency) + \
+                                operation.workcenter_id._get_expected_duration(product)
             total = ((duration_expected / 60.0) * operation.workcenter_id.costs_hour)
             operations.append({
                 'type': 'operation',
@@ -495,12 +501,13 @@ class ReportBomStructure(models.AbstractModel):
             wh_manufacture_rules = product._get_rules_from_location(product.property_stock_production, route_ids=warehouse.route_ids)
             wh_manufacture_rules -= rules
             rules_delay += sum(rule.delay for rule in wh_manufacture_rules)
+            manufacturing_lead = bom.company_id.manufacturing_lead if bom and bom.company_id else 0
             return {
                 'route_type': 'manufacture',
                 'route_name': manufacture_rules[0].route_id.display_name,
                 'route_detail': bom.display_name,
-                'lead_time': product.produce_delay + rules_delay,
-                'manufacture_delay': product.produce_delay + rules_delay,
+                'lead_time': product.produce_delay + rules_delay + manufacturing_lead,
+                'manufacture_delay': product.produce_delay + rules_delay + manufacturing_lead,
             }
         return {}
 

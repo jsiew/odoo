@@ -11,6 +11,10 @@
         margin-right: -$o-sheet-cancel-hpadding;
         margin-bottom: -40px;
     }
+
+    .o_notebook .o_notebook_headers .nav-link[name="mail_debug"] {
+        display: none;
+    }
 }
 
 @include media-breakpoint-up(lg, $o-extra-grid-breakpoints) {
@@ -218,11 +222,6 @@
     .o_sms_container ~ .o_mail_add_emoji{
         bottom: 55px;
     }
-}
-
-
-.o_mailing_contact_import_list {
-    min-height: 150px;
 }
 
 .o_field_mass_mailing_html {

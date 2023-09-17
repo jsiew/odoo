@@ -217,8 +217,7 @@ class IoTboxHomepage(Home):
             token = helpers.get_token()
         if iotname and platform.system() == 'Linux':
             subprocess.check_call([get_resource_path('point_of_sale', 'tools/posbox/configuration/rename_iot.sh'), iotname])
-        else:
-            helpers.odoo_restart(3)
+        helpers.odoo_restart(5)
         return 'http://' + helpers.get_ip() + ':8069'
 
     @http.route('/steps', type='http', auth='none', cors='*', csrf=False)
@@ -252,6 +251,11 @@ class IoTboxHomepage(Home):
             'server_status': helpers.get_odoo_server_url() or 'Not configured yet',
             'loading_message': 'Configure Domain Server'
         })
+
+    # Get password
+    @http.route('/hw_posbox_homepage/password', type='json', auth='none', methods=['POST'])
+    def view_password(self):
+        return helpers.generate_password()
 
     @http.route('/remote_connect', type='http', auth='none', cors='*')
     def remote_connect(self):

@@ -791,6 +791,7 @@ class Environment(Mapping):
         """ Mark ``field`` to be computed on ``records``. """
         if not records:
             return records
+        assert field.store and field.compute, "Cannot add to recompute no-store or no-computed field"
         self.all.tocompute[field].update(records._ids)
 
     def remove_to_compute(self, field, records):
@@ -928,14 +929,14 @@ class Cache(object):
             if field_cache and isinstance(next(iter(field_cache)), tuple):
                 data[field] = {
                     key: {
-                        Starred(id_) if id_ in dirty_ids else id_: val
+                        Starred(id_) if id_ in dirty_ids else id_: val if field.type != 'binary' else '<binary>'
                         for id_, val in key_cache.items()
                     }
                     for key, key_cache in field_cache.items()
                 }
             else:
                 data[field] = {
-                    Starred(id_) if id_ in dirty_ids else id_: val
+                    Starred(id_) if id_ in dirty_ids else id_: val if field.type != 'binary' else '<binary>'
                     for id_, val in field_cache.items()
                 }
         return repr(data)

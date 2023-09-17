@@ -1127,6 +1127,9 @@ var BasicModel = AbstractModel.extend({
             var record = self.localData[recordID];
             if (options.savePoint) {
                 self._visitChildren(record, function (rec) {
+                    for (let fieldName in (rec._changes || {})) {
+                        rec._editionViewType[fieldName] = options.viewType;
+                    }
                     var newValue = rec._changes || rec.data;
                     if (newValue instanceof Array) {
                         rec._savePoint = newValue.slice(0);
@@ -1171,6 +1174,12 @@ var BasicModel = AbstractModel.extend({
 
                 // in the case of a write, only perform the RPC if there are changes to save
                 if (method === 'create' || changedFields.length) {
+                    // Prevents multiple create/write when a save and urgentSave on occur at the same time.
+                    // We only want to do a create/write.
+                    if (record.saveInProgress) {
+                        return;
+                    }
+                    record.saveInProgress = true;
                     var args = method === 'write' ? [[record.data.id], changes] : [changes];
                     self._rpc({
                             model: record.model,
@@ -1190,12 +1199,22 @@ var BasicModel = AbstractModel.extend({
 
                             // Erase changes as they have been applied
                             record._changes = {};
+                            var data = Object.assign({}, record.data, record._changes);
+                            for (var fieldName in record.fields) {
+                                var type = record.fields[fieldName].type;
+                                if (type === 'many2many' || type === 'one2many') {
+                                    if (data[fieldName]) {
+                                        self.localData[data[fieldName]]._changes = [];
+                                    }
+                                }
+                            }
 
                             // Optionally clear the DataManager's cache
                             self._invalidateCache(record);
 
                             self.unfreezeOrder(record.id);
 
+                            record.saveInProgress = false;
                             // Update the data directly or reload them
                             if (shouldReload) {
                                 self._fetchRecord(record).then(function () {
@@ -1203,9 +1222,18 @@ var BasicModel = AbstractModel.extend({
                                 });
                             } else {
                                 _.extend(record.data, _changes);
+                                record._changes = {};
+                                for (const fieldName in record.fields) {
+                                    if (['many2many', 'one2many'].includes(record.fields[fieldName].type) && record.data[fieldName]) {
+                                        self.localData[record.data[fieldName]]._changes = [];
+                                    }
+                                }
                                 resolve(changedFields);
                             }
-                        }).guardedCatch(reject);
+                        }).guardedCatch((...args) => {
+                            record.saveInProgress = false;
+                            reject(...args)
+                        });
                 } else {
                     resolve(changedFields);
                 }
@@ -4053,7 +4081,7 @@ var BasicModel = AbstractModel.extend({
      */
     _isFieldProtected: function (record, fieldName, viewType) {
         viewType = viewType || record.viewType;
-        var fieldInfo = viewType && record.fieldsInfo && record.fieldsInfo[viewType][fieldName];
+        var fieldInfo = viewType && record.fieldsInfo && record.fieldsInfo[viewType] && record.fieldsInfo[viewType][fieldName];
         if (fieldInfo) {
             var rawModifiers = fieldInfo.modifiers || {};
             var modifiers = this._evalModifiers(record, _.pick(rawModifiers, 'readonly'));

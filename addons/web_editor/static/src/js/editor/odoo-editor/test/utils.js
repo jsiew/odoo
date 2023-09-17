@@ -9,6 +9,11 @@ export const Direction = {
     FORWARD: 'FORWARD',
 };
 
+// True iff test is being run with its mobile implementation.
+let isMobileTest = false;
+// True iff test has mobile implementation for any called method.
+let hasMobileTest = false;
+
 function _nextNode(node) {
     let next = node.firstChild || node.nextSibling;
     if (!next) {
@@ -150,7 +155,7 @@ export function setTestSelection(selection, doc = document) {
         domRange.setEnd(selection.anchorNode, selection.anchorOffset);
         domRange.collapse(false);
     }
-    const domSelection = selection.anchorNode.ownerDocument.getSelection();
+    const domSelection = doc.getSelection();
     domSelection.removeAllRanges();
     domSelection.addRange(domRange);
     try {
@@ -239,8 +244,8 @@ export function nodeLength(node) {
  *
  * This is used in the function `testEditor`.
  */
-export function renderTextualSelection() {
-    const selection = document.getSelection();
+export function renderTextualSelection(doc = document) {
+    const selection = doc.getSelection();
     if (selection.rangeCount === 0) {
         return;
     }
@@ -275,15 +280,27 @@ export function customErrorMessage(assertLocation, value, expected) {
     return `[${assertLocation}]\nactual  : '${value}'\nexpected: '${expected}'\n\nStackTrace `;
 }
 
+/**
+ * Return whether the device is in mobile view or not
+ */
+export function _isMobile(){
+    return matchMedia('(max-width: 767px)').matches;
+}
+
 export async function testEditor(Editor = OdooEditor, spec, options = {}) {
+    hasMobileTest = false;
+    isMobileTest = options.isMobile;
+
     const testNode = document.createElement('div');
-    document.querySelector('#editor-test-container').innerHTML = '';
-    document.querySelector('#editor-test-container').appendChild(testNode);
+    const testContainer = document.querySelector('#editor-test-container');
+    testContainer.innerHTML = '';
+    testContainer.append(testNode);
+    testContainer.append(document.createTextNode('')); // Formatting spaces.
     let styleTag;
     if (spec.styleContent) {
         styleTag = document.createElement('style');
         styleTag.textContent = spec.styleContent;
-        document.querySelector('#editor-test-container').appendChild(styleTag);
+        testContainer.append(styleTag);
     }
 
     // Add the content to edit and remove the "[]" markers *before* initializing
@@ -322,7 +339,12 @@ export async function testEditor(Editor = OdooEditor, spec, options = {}) {
 
         if (spec.stepFunction) {
             editor.observerActive('beforeUnitTests');
-            await spec.stepFunction(editor);
+            try {
+                await spec.stepFunction(editor);
+            } catch (e) {
+                e.message = (isMobileTest ? '[MOBILE VERSION] ' : '') + e.message;
+                throw e;
+            }
             editor.observerUnactive('afterUnitTests');
         }
 
@@ -372,6 +394,8 @@ export async function testEditor(Editor = OdooEditor, spec, options = {}) {
 
     if (error) {
         throw error;
+    } else if (hasMobileTest && !isMobileTest) {
+        await testEditor(Editor, spec, { ...options, isMobile: true });
     }
 }
 
@@ -443,27 +467,29 @@ export async function deleteForward(editor) {
 }
 
 export async function deleteBackward(editor) {
-    const selection = document.getSelection();
-    if (selection.isCollapsed) {
-        editor.execCommand('oDeleteBackward');
+    // This method has two implementations (desktop and mobile).
+    if (isMobileTest) {
+        // Some mobile keyboard use input event to trigger delete.
+        // This is a way to simulate this behavior.
+        const inputEvent = new InputEvent('input', {
+            inputType: 'deleteContentBackward',
+            data: null,
+            bubbles: true,
+            cancelable: false,
+        });
+        editor._onInput(inputEvent);
     } else {
-        // Better representation of what happened in the editor when the user
-        // presses the backspace key.
-        await triggerEvent(editor.editable, 'keydown', { key: 'Backspace' });
-        editor.document.execCommand('delete');
+        hasMobileTest = true; // Flag test for a re-run as mobile.
+        const selection = document.getSelection();
+        if (selection.isCollapsed) {
+            editor.execCommand('oDeleteBackward');
+        } else {
+            // Better representation of what happened in the editor when the user
+            // presses the backspace key.
+            await triggerEvent(editor.editable, 'keydown', { key: 'Backspace' });
+            editor.document.execCommand('delete');
+        }
     }
-}
-
-export async function deleteBackwardMobile(editor) {
-    // Some mobile keyboard use input event to trigger delete.
-    // This is a way to simulate this behavior.
-    const inputEvent = new InputEvent('input', {
-        inputType: 'deleteContentBackward',
-        data: null,
-        bubbles: true,
-        cancelable: false,
-    });
-    editor._onInput(inputEvent);
 }
 
 export async function insertParagraphBreak(editor) {
@@ -609,6 +635,50 @@ export function triggerEvent(
 
     currentElement.dispatchEvent(ev);
     return ev;
+}
+
+// Mock an paste event and send it to the editor.
+async function pasteData (editor, text, type) {
+    var mockEvent = {
+        dataType: 'text/plain',
+        data: text,
+        clipboardData: {
+            getData: (datatype) => type === datatype ? text : null,
+            files: [],
+            items: [],
+        },
+        preventDefault: () => { },
+    };
+    await editor._onPaste(mockEvent);
+};
+
+export const pasteText = async (editor, text) => pasteData(editor, text, 'text/plain');
+export const pasteHtml = async (editor, html) => pasteData(editor, html, 'text/html');
+export const pasteOdooEditorHtml = async (editor, html) => pasteData(editor, html, 'text/odoo-editor');
+const overridenDomClass = [
+    'HTMLBRElement',
+    'HTMLHeadingElement',
+    'HTMLParagraphElement',
+    'HTMLPreElement',
+    'HTMLQuoteElement',
+    'HTMLTableCellElement',
+    'Text',
+];
+
+export function patchEditorIframe(iframe) {
+    const iframeWindow = iframe.contentWindow;
+
+    for (const overridenClass of overridenDomClass) {
+        const windowClassPrototype = window[overridenClass].prototype;
+        const iframeWindowClassPrototype = iframeWindow[overridenClass].prototype;
+        const iframePrototypeMethodNames = Object.keys(iframeWindowClassPrototype);
+
+        for (const methodName of Object.keys(windowClassPrototype)) {
+            if (!iframePrototypeMethodNames.includes(methodName)) {
+                iframeWindowClassPrototype[methodName] = windowClassPrototype[methodName];
+            }
+        }
+    }
 }
 
 export class BasicEditor extends OdooEditor {}

@@ -10,10 +10,10 @@
 # Maja Stawicka <mjstwck@wp.pl>, 2022
 # Marcin Młynarczyk <mlynarczyk@gmail.com>, 2022
 # Andrzej Wiśniewski <a.wisniewski@hadron.eu.com>, 2022
-# Paweł Wodyński <pw@myodoo.pl>, 2022
 # Dariusz Żbikowski <darek@krokus.com.pl>, 2022
-# Wiktor Kaźmierczak <wik92tor@wp.pl>, 2022
 # Piotr Szlązak <szlazakpiotr@gmail.com>, 2022
+# Wiktor Kaźmierczak <wik92tor@wp.pl>, 2022
+# Paweł Wodyński <pw@myodoo.pl>, 2023
 # Tadeusz Karpiński <tadeuszkarpinski@gmail.com>, 2023
 # 
 msgid ""
@@ -353,6 +353,11 @@ msgid "Twitter Portal"
 msgstr "Portal Twitter"
 
 #. module: website_twitter
+#: model_terms:ir.ui.view,arch_db:website_twitter.website_twitter_snippet
+msgid "Twitter Scroller"
+msgstr "Scroller Twittera"
+
+#. module: website_twitter
 #: code:addons/website_twitter/models/res_config_settings.py:0
 #, python-format
 msgid ""
@@ -416,7 +421,7 @@ msgstr "Twitter: pobierz nowe ulubione"
 #: model:ir.model,name:website_twitter.model_website
 #: model:ir.model.fields,field_description:website_twitter.field_website_twitter_tweet__website_id
 msgid "Website"
-msgstr "Strona WWW"
+msgstr "Strona internetowa"
 
 #. module: website_twitter
 #: model:ir.model,name:website_twitter.model_website_twitter_tweet

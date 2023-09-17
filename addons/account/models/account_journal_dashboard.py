@@ -61,13 +61,14 @@ class account_journal(models.Model):
         today = fields.Date.context_today(self)
         activities = defaultdict(list)
         # search activity on move on the journal
+        lang = self.env.user.lang or get_lang(self.env).code
         sql_query = """
             SELECT activity.id,
                    activity.res_id,
                    activity.res_model,
                    activity.summary,
                    CASE WHEN activity.date_deadline < %(today)s THEN 'late' ELSE 'future' END as status,
-                   act_type.name as act_type_name,
+                   COALESCE(act_type.name->> %(lang)s, act_type.name->>'en_US') as act_type_name,
                    act_type.category as activity_category,
                    activity.date_deadline,
                    move.date,
@@ -77,9 +78,8 @@ class account_journal(models.Model):
               JOIN mail_activity activity ON activity.res_id = move.id AND activity.res_model = 'account.move'
          LEFT JOIN mail_activity_type act_type ON activity.activity_type_id = act_type.id
              WHERE move.journal_id = ANY(%(ids)s)
-               AND (act_type.category != 'tax_report' OR (act_type.category = 'tax_report' AND activity.date_deadline <= %(today)s))
         """
-        self.env.cr.execute(sql_query, {'ids': self.ids, 'today': today})
+        self.env.cr.execute(sql_query, {'ids': self.ids, 'today': today, 'lang': lang})
         for activity in self.env.cr.dictfetchall():
             act = {
                 'id': activity['id'],
@@ -105,7 +105,7 @@ class account_journal(models.Model):
               JOIN res_company company ON company.id = move.company_id
              WHERE move.journal_id = ANY(%(journal_ids)s)
                AND move.state = 'posted'
-               AND (company.fiscalyear_lock_date IS NULL OR move.date >= company.fiscalyear_lock_date)
+               AND (company.fiscalyear_lock_date IS NULL OR move.date > company.fiscalyear_lock_date)
           GROUP BY move.journal_id, move.sequence_prefix
             HAVING COUNT(*) != MAX(move.sequence_number) - MIN(move.sequence_number) + 1
         """, {
@@ -184,6 +184,7 @@ class account_journal(models.Model):
                 for i in range(30, 0, -5):
                     current_date = today + timedelta(days=-i)
                     data.append(build_graph_data(current_date, random.randint(-5, 15), currency))
+                    graph_key = _('Sample data')
             else:
                 last_balance = journal.current_statement_balance
                 data.append(build_graph_data(today, last_balance, currency))
@@ -193,7 +194,7 @@ class account_journal(models.Model):
                 #(graph is drawn backward)
                 for val in journal_result:
                     date = val['date']
-                    if date != today.strftime(DF):  # make sure the last point in the graph is today
+                    if date.strftime(DF) != today.strftime(DF):  # make sure the last point in the graph is today
                         data[:0] = [build_graph_data(date, amount, currency)]
                     amount -= val['amount']
 
@@ -351,7 +352,7 @@ class account_journal(models.Model):
                       SELECT id
                         FROM account_bank_statement
                        WHERE journal_id = journal.id
-                    ORDER BY date DESC
+                    ORDER BY first_line_index DESC
                        LIMIT 1
                    ) statement ON TRUE
              WHERE journal.id = ANY(%s)
@@ -403,7 +404,7 @@ class account_journal(models.Model):
         field_list = [
             "account_move.journal_id",
             "(CASE WHEN account_move.move_type IN ('out_refund', 'in_refund') THEN -1 ELSE 1 END) * account_move.amount_residual AS amount_total",
-            "account_move.amount_residual_signed AS amount_total_company",
+            "(CASE WHEN account_move.move_type IN ('in_invoice', 'in_refund', 'in_receipt') THEN -1 ELSE 1 END) * account_move.amount_residual_signed AS amount_total_company",
             "account_move.currency_id AS currency",
             "account_move.move_type",
             "account_move.invoice_date",
@@ -422,7 +423,7 @@ class account_journal(models.Model):
         late_query_results = group_by_journal(self.env.cr.dictfetchall())
 
         to_check_vals = {
-            vals['journal_id']: vals
+            vals['journal_id'][0]: vals
             for vals in self.env['account.move'].read_group(
                 domain=[('journal_id', 'in', sale_purchase_journals.ids), ('to_check', '=', True)],
                 fields=['amount_total_signed'],
@@ -439,7 +440,7 @@ class account_journal(models.Model):
             (number_late, sum_late) = self._count_results_and_sum_amounts(late_query_results[journal.id], currency, curr_cache=curr_cache)
             to_check = to_check_vals.get(journal.id, {})
             dashboard_data[journal.id].update({
-                'number_to_check': to_check.get('__count', 0),
+                'number_to_check': to_check.get('journal_id_count', 0),
                 'to_check_balance': to_check.get('amount_total_signed', 0),
                 'title': _('Bills to pay') if journal.type == 'purchase' else _('Invoices owed to you'),
                 'number_draft': number_draft,
@@ -458,7 +459,7 @@ class account_journal(models.Model):
         if not general_journals:
             return
         to_check_vals = {
-            vals['journal_id']: vals
+            vals['journal_id'][0]: vals
             for vals in self.env['account.move'].read_group(
                 domain=[('journal_id', 'in', general_journals.ids), ('to_check', '=', True)],
                 fields=['amount_total_signed'],
@@ -467,7 +468,7 @@ class account_journal(models.Model):
             )
         }
         for journal in general_journals:
-            vals = to_check_vals.get('journal_id', {})
+            vals = to_check_vals.get(journal.id, {})
             dashboard_data[journal.id].update({
                 'number_to_check': vals.get('__count', 0),
                 'to_check_balance': vals.get('amount_total_signed', 0),
@@ -676,19 +677,20 @@ class account_journal(models.Model):
         action['context'] = context
         action['context'].update({
             'default_journal_id': self.id,
-            'search_default_journal_id': self.id,
         })
-
         domain_type_field = action['res_model'] == 'account.move.line' and 'move_id.move_type' or 'move_type' # The model can be either account.move or account.move.line
 
         # Override the domain only if the action was not explicitly specified in order to keep the
         # original action domain.
+        if action.get('domain') and isinstance(action['domain'], str):
+            action['domain'] = ast.literal_eval(action['domain'] or '[]')
         if not self._context.get('action_name'):
             if self.type == 'sale':
                 action['domain'] = [(domain_type_field, 'in', ('out_invoice', 'out_refund', 'out_receipt'))]
             elif self.type == 'purchase':
                 action['domain'] = [(domain_type_field, 'in', ('in_invoice', 'in_refund', 'in_receipt', 'entry'))]
 
+        action['domain'] = (action['domain'] or []) + [('journal_id', '=', self.id)]
         return action
 
     def open_spend_money(self):

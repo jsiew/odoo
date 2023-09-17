@@ -1429,8 +1429,21 @@ class DynamicList extends DataPoint {
     setup(params, state) {
         this.groupBy = params.groupBy || [];
         this.domain = markRaw(params.domain || []);
-        this.orderBy =
-            params.orderBy && params.orderBy.length ? params.orderBy : state.orderBy || []; // rename orderBy
+
+        // restore the previously exported initialOrderBy or initialize it to `params.orderBy`
+        // this is what will be exported as `state.initialOrderBy`
+        this.initialOrderBy = state.initialOrderBy || params.orderBy || [];
+
+        if (
+            params.orderBy &&
+            params.orderBy.length &&
+            JSON.stringify(params.orderBy) !== JSON.stringify(state.initialOrderBy)
+        ) {
+            this.orderBy = params.orderBy;
+        } else {
+            this.orderBy = state.orderBy || [];
+        }
+
         this.offset = state.offset || 0;
         this.count = 0;
         this.initialLimit = state.initialLimit || params.limit || this.constructor.DEFAULT_LIMIT;
@@ -1541,6 +1554,7 @@ class DynamicList extends DataPoint {
             limit: this.limit,
             initialLimit: this.initialLimit,
             orderBy: this.orderBy,
+            initialOrderBy: this.initialOrderBy,
         };
     }
 
@@ -2202,6 +2216,9 @@ export class DynamicGroupList extends DynamicList {
             group.count = group.count - resIds.length;
             allResIds.push(...resIds);
         }
+        if (this.isDomainSelected && allResIds.length > 0) {
+            await this.load();
+        }
         // Return the list of all deleted resIds.
         // Will be used by the calling group to update its count.
         return allResIds;
@@ -2332,6 +2349,13 @@ export class DynamicGroupList extends DynamicList {
             return;
         }
         super.sortBy(fieldName);
+    }
+
+    selectDomain(value) {
+        for (const group of this.groups) {
+            group.list.selectDomain(value);
+        }
+        super.selectDomain(value);
     }
 
     // ------------------------------------------------------------------------
@@ -3089,7 +3113,7 @@ export class StaticList extends DataPoint {
             if (DELETE_ALL === this._commands[0][0] && !allFields) {
                 for (const resId of this._serverIds) {
                     if (!this.currentIds.includes(resId)) {
-                        commands.push(x2ManyCommands.delete(resId));
+                        commands.push(x2ManyCommands.forget(resId));
                     }
                 }
             }
@@ -3476,9 +3500,20 @@ export class RelationalModel extends Model {
         if (
             this.defaultGroupBy &&
             !this.env.inDialog &&
-            !(params.groupBy && params.groupBy.length)
+            !(rootParams.groupBy && rootParams.groupBy.length)
         ) {
             rootParams.groupBy = [this.defaultGroupBy];
+        }
+
+        if (rootParams.context) {
+            // *_view_ref and search_default_* context keys are not destined to us, rather
+            // they were tyîcally "consumed" by the View.
+            // The default_* context keys are, on the contrary, destined for us.
+            rootParams.context = Object.fromEntries(
+                Object.entries(rootParams.context).filter(
+                    ([key]) => !key.endsWith("_view_ref") && !key.startsWith("search_default_")
+                )
+            );
         }
         rootParams.rawContext = {
             make: () => {

@@ -87,11 +87,12 @@ class GeoCoder(models.AbstractModel):
             return None
         url = 'https://nominatim.openstreetmap.org/search'
         try:
-            headers = {'User-Agent': 'Odoo (http://www.odoo.com/contactus)'}
+            headers = {'User-Agent': self.env['ir.config_parameter'].sudo().get_param('base_geolocalize.user_agent',
+                                                                               'Odoo (http://www.odoo.com/contactus)')}
             response = requests.get(url, headers=headers, params={'format': 'json', 'q': addr})
             _logger.info('openstreetmap nominatim service called')
             if response.status_code != 200:
-                _logger.error('Request to openstreetmap failed.\nCode: %s\nContent: %s' % (response.status_code, response.content))
+                _logger.warning('Request to openstreetmap failed.\nCode: %s\nContent: %s', response.status_code, response.content)
             result = response.json()
         except Exception as e:
             self._raise_query_error(e)

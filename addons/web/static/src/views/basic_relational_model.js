@@ -243,6 +243,11 @@ export class Record extends DataPoint {
                 case "integer":
                 case "monetary":
                     continue;
+                case "html":
+                    if (this.isRequired(fieldName) && this.data[fieldName].length === 0) {
+                        this._setInvalidField(fieldName);
+                    }
+                    break;
                 case "properties":
                     if (!this.checkPropertiesValidity(fieldName)) {
                         this._setInvalidField(fieldName);
@@ -261,6 +266,21 @@ export class Record extends DataPoint {
             }
         }
         return !this._invalidFields.size;
+    }
+
+    openInvalidFieldsNotification() {
+        if (this._invalidFields.size) {
+            const invalidFields = [...this._invalidFields].map((fieldName) => {
+                return `<li>${escape(this.fields[fieldName].string || fieldName)}</li>`;
+            }, this);
+            this._closeInvalidFieldsNotification = this.model.notificationService.add(
+                markup(`<ul>${invalidFields.join("")}</ul>`),
+                {
+                    title: this.model.env._t("Invalid fields: "),
+                    type: "danger",
+                }
+            );
+        }
     }
 
     async switchMode(mode, options) {
@@ -339,8 +359,10 @@ export class Record extends DataPoint {
         }
         return value.every(
             (propertyDefinition) =>
-                !propertyDefinition.id ||
-                (propertyDefinition.string && propertyDefinition.string.length)
+                propertyDefinition.name &&
+                propertyDefinition.name.length &&
+                propertyDefinition.string &&
+                propertyDefinition.string.length
         );
     }
 
@@ -417,9 +439,10 @@ export class Record extends DataPoint {
                             handle: data[fieldName].id,
                             handleField,
                             viewType: viewMode,
-                            __syncParent: async (value) => {
+                            __syncParent: async (value, viewType) => {
                                 await this.model.__bm__.save(this.__bm_handle__, {
                                     savePoint: true,
+                                    viewType,
                                 });
                                 await this.update({ [fieldName]: value });
                             },
@@ -561,7 +584,11 @@ export class Record extends DataPoint {
             const prom = this.model.__bm__.notifyChanges(this.__bm_handle__, data, {
                 viewType: this.__viewType,
             });
-            prom.catch(resolveUpdatePromise); // onchange rpc may return an error
+            prom.catch(() => {
+                this.model.notify();
+                // onchange rpc may return an error
+                resolveUpdatePromise();
+            });
             const fieldNames = await prom;
             this._removeInvalidFields(fieldNames);
             for (const fieldName of fieldNames) {
@@ -605,16 +632,7 @@ export class Record extends DataPoint {
         });
         this._closeInvalidFieldsNotification();
         if (!(await this.checkValidity())) {
-            const invalidFields = [...this._invalidFields].map((fieldName) => {
-                return `<li>${escape(this.fields[fieldName].string || fieldName)}</li>`;
-            }, this);
-            this._closeInvalidFieldsNotification = this.model.notificationService.add(
-                markup(`<ul>${invalidFields.join("")}</ul>`),
-                {
-                    title: this.model.env._t("Invalid fields: "),
-                    type: "danger",
-                }
-            );
+            this.openInvalidFieldsNotification();
             resolveSavePromise();
             return false;
         }
@@ -859,7 +877,9 @@ export class StaticList extends DataPoint {
 
     async delete(recordId, operation = "DELETE") {
         const record = this.records.find((r) => r.id === recordId);
-        await this.__syncParent({ operation, ids: [record.__bm_handle__] });
+        if (record) {
+            await this.__syncParent({ operation, ids: [record.__bm_handle__] });
+        }
     }
 
     async add(object, params = { isM2M: false }) {
@@ -1296,7 +1316,7 @@ export class RelationalModel extends Model {
             await record.save({ noReload: true });
             operation = { operation: "TRIGGER_ONCHANGE" };
         }
-        await list.__syncParent(operation);
+        await list.__syncParent(operation, record.__viewType);
         if (isM2M) {
             await record.load();
         }

@@ -30,6 +30,7 @@ import { makeView, setupViewRegistries } from "@web/../tests/views/helpers";
 import { registerCleanup } from "@web/../tests/helpers/cleanup";
 import { registry } from "@web/core/registry";
 import { session } from "@web/session";
+import { X2ManyField } from "@web/views/fields/x2many/x2many_field";
 
 let serverData;
 let target;
@@ -2510,6 +2511,45 @@ QUnit.module("Fields", (hooks) => {
         await clickSave(target);
     });
 
+    QUnit.test(
+        "When viewing one2many records in an embedded kanban, the delete button should say 'Delete' and not 'Remove'",
+        async function (assert) {
+            assert.expect(1);
+            serverData.views = {
+                "turtle,false,form": `
+                <form>
+                    <h3>Data</h3>
+                </form>`,
+            };
+            await makeView({
+                type: "form",
+                resModel: "partner",
+                serverData,
+                arch: `
+                <form>
+                    <field name="turtles">
+                        <kanban>
+                            <field name="display_name"/>
+                            <templates>
+                                <t t-name="kanban-box">
+                                    <div t-att-class="'oe_kanban_global_click'">
+                                        <h3>Record 1</h3>
+                                    </div>
+                                </t>
+                            </templates>
+                        </kanban>
+                    </field>
+                </form>`,
+                resId: 1,
+            });
+
+            // Opening the record to see the footer buttons
+            await click(target.querySelector(".o_kanban_record"));
+
+            assert.strictEqual(target.querySelector(".o_btn_remove").textContent, "Delete");
+        }
+    );
+
     QUnit.test("open a record in a one2many kanban (mode 'readonly')", async function (assert) {
         serverData.views = {
             "turtle,false,form": `
@@ -2589,6 +2629,51 @@ QUnit.module("Fields", (hooks) => {
             "donatello"
         );
     });
+
+    QUnit.test(
+        "open a record in a one2many kanban (mode 'edit') without access rights",
+        async function (assert) {
+            serverData.views = {
+                "turtle,false,form": `
+                <form edit='0'>
+                    <field name="display_name"/>
+                </form>`,
+            };
+            await makeView({
+                type: "form",
+                resModel: "partner",
+                serverData,
+                arch: `
+                <form>
+                    <field name="turtles">
+                        <kanban>
+                            <field name="display_name"/>
+                            <templates>
+                                <t t-name="kanban-box">
+                                    <div class="oe_kanban_global_click">
+                                        <t t-esc="record.display_name.value"/>
+                                    </div>
+                                </t>
+                            </templates>
+                        </kanban>
+                    </field>
+                </form>`,
+                resId: 1,
+            });
+
+            assert.strictEqual(target.querySelector(".o_kanban_record ").innerText, "donatello");
+
+            await click(target.querySelector(".o_kanban_record"));
+
+            assert.containsOnce(target, ".modal");
+            // There should be no input since it is readonly
+            assert.containsNone(target, ".modal div[name=display_name] input");
+            assert.strictEqual(
+                target.querySelector(".modal div[name=display_name] span").textContent,
+                "donatello"
+            );
+        }
+    );
 
     QUnit.test("add record in a one2many non editable list with context", async function (assert) {
         assert.expect(1);
@@ -2928,6 +3013,50 @@ QUnit.module("Fields", (hooks) => {
         // FIXME: it would be nice to test that the view is re-rendered correctly,
         // but as the relational data isn't re-fetched, the rendering is ok even
         // if the changes haven't been saved
+    });
+
+    QUnit.test("one2many list: double click on delete record", async function (assert) {
+        // This test simulates a precise scenario: a one2many contains a record, and the user
+        // clicks on the trash icon to remove it. It clicks again, precisely when the model has
+        // been updated (so the record no longer exists there), but before the x2many field is
+        // re-rendered (so the icon is still present).
+        serverData.models.partner.records[0].p = [1];
+
+        let clickOnDeleteBeforeRender = false;
+        patchWithCleanup(X2ManyField.prototype, {
+            setup() {
+                this._super.apply(this, arguments);
+                owl.onWillRender(() => {
+                    if (clickOnDeleteBeforeRender) {
+                        assert.step("click a second time");
+                        click(target.querySelector("td.o_list_record_remove"));
+                    }
+                });
+            },
+        });
+        await makeView({
+            type: "form",
+            resModel: "partner",
+            serverData,
+            arch: `
+                <form>
+                    <field name="p">
+                        <tree>
+                            <field name="display_name"/>
+                        </tree>
+                    </field>
+                </form>`,
+            resId: 1,
+        });
+
+        assert.containsOnce(target, ".o_data_row");
+
+        click(target.querySelector("td.o_list_record_remove"));
+        clickOnDeleteBeforeRender = true;
+        await nextTick();
+        await nextTick();
+        assert.verifySteps(["click a second time"]);
+        assert.containsNone(target, ".o_data_row");
     });
 
     QUnit.test("one2many kanban: edition", async function (assert) {
@@ -12523,7 +12652,7 @@ QUnit.module("Fields", (hooks) => {
     });
 
     QUnit.test('Add a line, click on "Save & New" with an invalid form', async function (assert) {
-        await makeView({
+        const form = await makeView({
             type: "form",
             resModel: "partner",
             serverData,
@@ -12539,6 +12668,13 @@ QUnit.module("Fields", (hooks) => {
                     </field>
                 </form>`,
         });
+        patchWithCleanup(form.env.services.notification, {
+            add: (message, params) => {
+                assert.step(params.type);
+                assert.strictEqual(params.title, "Invalid fields: ");
+                assert.strictEqual(message.toString(), "<ul><li>Displayed name</li></ul>");
+            },
+        });
 
         assert.containsNone(target, ".o_data_row");
         // Add a new record
@@ -12548,6 +12684,7 @@ QUnit.module("Fields", (hooks) => {
         // Click on "Save & New" with an invalid form
         await click(target, ".o_dialog .o_form_button_save_new");
         assert.containsOnce(target, ".o_dialog .o_form_view");
+        assert.verifySteps(["danger"]);
 
         // Check that no buttons are disabled
         assert.hasAttrValue(
@@ -12690,5 +12827,49 @@ QUnit.module("Fields", (hooks) => {
         await click(target, ".o_form_button_save");
         assert.verifySteps(["create: partner", "read: partner", "read: partner_type"]);
         assert.strictEqual(target.querySelector(".o_data_row").textContent, "changed5");
+    });
+
+    QUnit.test("pressing tab before an onchange is resolved", async (assert) => {
+        const onchangeGetPromise = makeDeferred();
+
+        serverData.models.partner.onchanges = {
+            display_name: (obj) => {
+                obj.display_name = "test";
+            },
+        };
+
+        await makeView({
+            type: "form",
+            resModel: "partner",
+            serverData,
+            arch: `
+                <form>
+                    <field name="p">
+                        <tree editable="bottom" >
+                            <field name="display_name"/>
+                        </tree>
+                    </field>
+                </form>`,
+            resId: 1,
+            async mockRPC(route, args, performRPC) {
+                if (
+                    args.method === "onchange" &&
+                    args.model === "product" &&
+                    args.args[2] === "display_name"
+                ) {
+                    await onchangeGetPromise;
+                }
+            },
+        });
+
+        await click(target.querySelector(".o_field_x2many_list_row_add a"));
+
+        await editInput(target, ".o_field_widget[name='display_name'] input", "gold");
+        triggerHotkey("Tab");
+        triggerHotkey("Tab");
+        onchangeGetPromise.resolve();
+        await nextTick();
+
+        assert.containsN(target, ".o_data_row", 2);
     });
 });

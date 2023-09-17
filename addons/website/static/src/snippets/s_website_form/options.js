@@ -102,6 +102,21 @@ const FormEditor = options.Class.extend({
         return this.$target[0].dataset.mark;
     },
     /**
+     * Replace all `"` character by `&quot;`, all `'` character by `&apos;` and
+     * all "`" character by `&lsquo;`. This is needed in order to be able to
+     * perform querySelector of this type: `querySelector(`[name="${name}"]`)`.
+     * It also encodes the "\\" sequence to avoid having to escape it when doing
+     * a `querySelector`.
+     *
+     * @param {string} name
+     */
+    _getQuotesEncodedName(name) {
+        return name.replaceAll(/"/g, character => `&quot;`)
+                   .replaceAll(/'/g, character => `&apos;`)
+                   .replaceAll(/`/g, character => `&lsquo;`)
+                   .replaceAll("\\", character => `&bsol;`);
+    },
+    /**
      * @private
      * @returns {boolean}
      */
@@ -130,6 +145,12 @@ const FormEditor = options.Class.extend({
             $(template.content.querySelector('.s_website_form_field_description')).replaceWith(field.description);
         }
         template.content.querySelectorAll('input.datetimepicker-input').forEach(el => el.value = field.propertyValue);
+        template.content.querySelectorAll("[name]").forEach(el => {
+            el.name = this._getQuotesEncodedName(el.name);
+        });
+        template.content.querySelectorAll("[data-name]").forEach(el => {
+            el.dataset.name = this._getQuotesEncodedName(el.dataset.name);
+        });
         return template.content.firstElementChild;
     },
 });
@@ -164,6 +185,7 @@ const FieldEditor = FormEditor.extend({
         } else {
             field = Object.assign({}, this.fields[this._getFieldName()]);
             field.string = labelText;
+            field.type = this._getFieldType();
         }
         if (!noRecords) {
             field.records = this._getListItems();
@@ -951,6 +973,7 @@ options.registry.WebsiteFieldEditor = FieldEditor.extend({
     setLabelText: function (previewMode, value, params) {
         this.$target.find('.s_website_form_label_content').text(value);
         if (this._isFieldCustom()) {
+            value = this._getQuotesEncodedName(value);
             const multiple = this.$target[0].querySelector('.s_website_form_multiple');
             if (multiple) {
                 multiple.dataset.name = value;

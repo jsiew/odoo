@@ -37,6 +37,14 @@ const LinkPopoverWidget = Widget.extend({
         this.$copyLink = this.$('.o_we_copy_link');
         this.$fullUrl = this.$('.o_we_full_url');
 
+        // Use the right ClipboardJS with respect to the prototype of this.el
+        // since, starting with Firefox 109, a widget element prototype that is
+        // adopted by an iframe will not be instanceof its original constructor.
+        // See: https://github.com/webcompat/web-bugs/issues/118350
+        const ClipboardJS =
+            this.el instanceof HTMLElement
+                ? window.ClipboardJS
+                : this.el.ownerDocument.defaultView.ClipboardJS;
         // Copy onclick handler
         // ClipboardJS uses "instanceof" to verify the elements passed to its
         // constructor. Unfortunately, when the element is within an iframe,
@@ -142,6 +150,24 @@ const LinkPopoverWidget = Widget.extend({
             $(this.options.wysiwyg.odooEditor.document).on('mouseup.link_popover', onClickDocument);
         }
 
+        // Update popover's content and position upon changes
+        // on the link's label or href.
+        this._observer = new MutationObserver(records => {
+            if (!popoverShown) {
+                return;
+            }
+            if (records.some(record => record.type === 'attributes')) {
+                this._loadAsyncLinkPreview();
+            }
+            this.$target.popover('update');
+        });
+        this._observer.observe(this.target, {
+            subtree: true,
+            characterData: true,
+            attributes: true,
+            attributeFilter: ['href'],
+        });
+
         return this._super(...arguments);
     },
     /**
@@ -156,6 +182,7 @@ const LinkPopoverWidget = Widget.extend({
         $(document).off('.link_popover');
         $(this.options.wysiwyg.odooEditor.document).off('.link_popover');
         this.$target.popover('dispose');
+        this._observer.disconnect();
         return this._super(...arguments);
     },
 

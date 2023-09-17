@@ -3,7 +3,6 @@ import {
     BasicEditor,
     click,
     deleteBackward,
-    deleteBackwardMobile,
     insertText,
     insertParagraphBreak,
     insertLineBreak,
@@ -16,10 +15,17 @@ const convertToLink = createLink;
 const unlink = async function (editor) {
     editor.execCommand('unlink');
 };
-const testUrlRegex = (url) => {
-    it(`should be a link: ${url}`, () => {
-        window.chai.assert.exists(url.match(URL_REGEX));
-        window.chai.assert.exists(url.match(URL_REGEX_WITH_INFOS));
+const testUrlRegex = (content, {expectedUrl} = {}) => {
+    const message = expectedUrl ?
+        `should have the text be "${content}" with one link ${expectedUrl}` :
+        `should be a link: ${content}`;
+    it(message, () => {
+        const match = content.match(URL_REGEX);
+        if (expectedUrl) {
+            window.chai.assert.equal(expectedUrl, match && match[0]);
+        }
+        window.chai.assert.exists(content.match(URL_REGEX));
+        window.chai.assert.exists(content.match(URL_REGEX_WITH_INFOS));
     });
 }
 const testNotUrlRegex = (url) => {
@@ -32,10 +38,47 @@ const testNotUrlRegex = (url) => {
 describe('Link', () => {
     describe('regex', () => {
         testUrlRegex('google.com');
+        testUrlRegex('a google.com b', {expectedUrl: 'google.com'});
+
+        // Url separator
+        testUrlRegex('google.com/', {expectedUrl: 'google.com/'});
+        testUrlRegex('google.com?', {expectedUrl: 'google.com?'});
+        testUrlRegex('google.com#', {expectedUrl: 'google.com#'});
+
+        testUrlRegex('google.com!', {expectedUrl: 'google.com'});
+        testUrlRegex('google.com)', {expectedUrl: 'google.com'});
+        testUrlRegex('google.com(', {expectedUrl: 'google.com'});
+        testUrlRegex('google.com. a', {expectedUrl: 'google.com'});
+        testUrlRegex('google.com, a', {expectedUrl: 'google.com'});
+
+        // Some special characters should not be included if at the end.
+        testUrlRegex('google.com/.', {expectedUrl: 'google.com/'});
+        testUrlRegex('google.com/,', {expectedUrl: 'google.com/'});
+        testUrlRegex('google.com/)', {expectedUrl: 'google.com/'});
+        testUrlRegex('google.com/]', {expectedUrl: 'google.com/'});
+        testUrlRegex('google.com/}', {expectedUrl: 'google.com/'});
+        testUrlRegex("google.com/'", {expectedUrl: 'google.com/'});
+        testUrlRegex('google.com/"', {expectedUrl: 'google.com/'});
+
+        // The previous special character should be included when they are nt at the end.
+        testUrlRegex('google.com/.a', {expectedUrl: 'google.com/.a'});
+        testUrlRegex('google.com/,a', {expectedUrl: 'google.com/,a'});
+        testUrlRegex('google.com/)a', {expectedUrl: 'google.com/)a'});
+        testUrlRegex('google.com/]a', {expectedUrl: 'google.com/]a'});
+        testUrlRegex('google.com/}a', {expectedUrl: 'google.com/}a'});
+        testUrlRegex("google.com/'a", {expectedUrl: "google.com/'a"});
+        testUrlRegex('google.com/"a', {expectedUrl: 'google.com/"a'});
+
+        // Other special character can be included at the end.
+        testUrlRegex('google.com/(', {expectedUrl: 'google.com/('});
+        testUrlRegex('google.com/[', {expectedUrl: 'google.com/['});
+        testUrlRegex('google.com/{', {expectedUrl: 'google.com/{'});
+
         testUrlRegex('google.co.uk');
         testUrlRegex('http://google.com');
         testUrlRegex('https://google.com');
         testUrlRegex('https://www.google.com');
+        testUrlRegex('https://google.shop');
         testNotUrlRegex('google.shop');
         testUrlRegex('google.com/');
         testUrlRegex('http://google.com/');
@@ -50,6 +93,16 @@ describe('Link', () => {
         testNotUrlRegex('a.b.bc');
         testNotUrlRegex('20.08.2022');
         testNotUrlRegex('31.12');
+
+        // Url data and anchors count as part of the url.
+        testUrlRegex('google.com?data=hello', { expectedUrl: 'google.com?data=hello' });
+        testUrlRegex('google.com/?data=hello', { expectedUrl: 'google.com/?data=hello' });
+        testUrlRegex('google.com/foo/?data=hello', { expectedUrl: 'google.com/foo/?data=hello' });
+        testUrlRegex('google.com/.?data=hello', { expectedUrl: 'google.com/.?data=hello' });
+        testUrlRegex('google.com?data=hello#anchor', { expectedUrl: 'google.com?data=hello#anchor' });
+        testUrlRegex('google.com/?data=hello#anchor', { expectedUrl: 'google.com/?data=hello#anchor' });
+        testUrlRegex('google.com/.?data=hello#anchor', { expectedUrl: 'google.com/.?data=hello#anchor' });
+        testUrlRegex('google.com/foo/?data=hello&data2=foo#anchor', { expectedUrl: 'google.com/foo/?data=hello&data2=foo#anchor' });
     });
     describe('insert Link', () => {
         // This fails, but why would the cursor stay inside the link
@@ -219,6 +272,45 @@ describe('Link', () => {
                         await insertText(editor, 'o');
                     },
                     contentAfter: '<p>a<a href="http://google.com">http://goo[]gle.com</a>b</p>',
+                });
+                await testEditor(BasicEditor, {
+                    contentBefore: '<p>a<a href="mailto:hello@moto.com">hello@moto[].com</a></p>',
+                    stepFunction: async editor => {
+                        await insertText(editor, 'r');
+                    },
+                    contentAfter: '<p>a<a href="mailto:hello@motor.com">hello@motor[].com</a></p>',
+                });
+            });
+            it('should change the url when the label change, without changing the protocol', async () => {
+                await testEditor(BasicEditor, {
+                    contentBefore: '<p>a<a href="http://google.co">google.co[]</a>b</p>',
+                    stepFunction: async editor => {
+                        await insertText(editor, 'm');
+                    },
+                    contentAfter: '<p>a<a href="http://google.com">google.com[]</a>b</p>',
+                });
+                await testEditor(BasicEditor, {
+                    contentBefore: '<p>a<a href="https://google.co">google.co[]</a>b</p>',
+                    stepFunction: async editor => {
+                        await insertText(editor, 'm');
+                    },
+                    contentAfter: '<p>a<a href="https://google.com">google.com[]</a>b</p>',
+                });
+            });
+            it('should change the url when the label change, changing to the suitable protocol', async () => {
+                await testEditor(BasicEditor, {
+                    contentBefore: '<p>a<a href="http://hellomoto.com">hello[]moto.com</a></p>',
+                    stepFunction: async editor => {
+                        await insertText(editor, '@');
+                    },
+                    contentAfter: '<p>a<a href="mailto:hello@moto.com">hello@[]moto.com</a></p>',
+                });
+                await testEditor(BasicEditor, {
+                    contentBefore: '<p>a<a href="mailto:hello@moto.com">hello@[]moto.com</a></p>',
+                    stepFunction: async editor => {
+                        await deleteBackward(editor);
+                    },
+                    contentAfter: '<p>a<a href="https://hellomoto.com">hello[]moto.com</a></p>',
                 });
             });
             it('should change the url in one step', async () => {
@@ -521,6 +613,15 @@ describe('Link', () => {
                     contentAfter: '<p>a]bc[<a href="exist">de</a>f</p>',
                 });
             });
+            it('should not unlink selected non-editable links', async () => {
+                await testEditor(BasicEditor, {
+                    contentBefore: '<p><a href="exist">[ab</a><a contenteditable="false" href="exist">cd</a>ef]</p>',
+                    stepFunction: async editor => {
+                        await unlink(editor);
+                    },
+                    contentAfter: '<p>[ab<a contenteditable="false" href="exist">cd</a>ef]</p>',
+                });
+            });
         });
     });
     describe('isolated link', () => {
@@ -555,27 +656,13 @@ describe('Link', () => {
                 }
             });
         });
-        it('should keep isolated link after a keyboard delete', async () => {
+        it('should keep isolated link after a delete', async () => {
             await testEditor(BasicEditor, {
                 contentBefore: '<p>a<a href="#/">b[]</a>c</p>',
                 stepFunction: async editor => {
                     const a = await clickOnLink(editor);
                     console.log(a.closest('.odoo-editor-editable').outerHTML);
                     await deleteBackward(editor);
-                    console.log(a.closest('.odoo-editor-editable').outerHTML);
-                    window.chai.expect(a.parentElement.isContentEditable).to.be.equal(false);
-                },
-                contentAfterEdit: '<p>a<a href="#/" contenteditable="true" data-oe-zws-empty-inline="">[]\u200B</a>c</p>',
-                contentAfter: '<p>a[]c</p>',
-            });
-        });
-        it('should keep isolated link after a mobile delete', async () => {
-            await testEditor(BasicEditor, {
-                contentBefore: '<p>a<a href="#/">b[]</a>c</p>',
-                stepFunction: async editor => {
-                    const a = await clickOnLink(editor);
-                    console.log(a.closest('.odoo-editor-editable').outerHTML);
-                    await deleteBackwardMobile(editor);
                     console.log(a.closest('.odoo-editor-editable').outerHTML);
                     window.chai.expect(a.parentElement.isContentEditable).to.be.equal(false);
                 },
@@ -601,22 +688,21 @@ describe('Link', () => {
                 contentAfter: '<p>a<a href="#/">123[]</a>c</p>',
             });
         });
-        it('should keep isolated link after a mobile delete and typing', async () => {
+        it('should delete the content from the link when popover is active', async () => {
             await testEditor(BasicEditor, {
-                contentBefore: '<p>a<a href="#/">b[]</a>c</p>',
+                contentBefore: '<p><a href="#/">abc[]abc</a></p>',
                 stepFunction: async editor => {
                     const a = await clickOnLink(editor);
                     window.chai.expect(a.parentElement.isContentEditable).to.be.equal(false);
-                    await deleteBackwardMobile(editor);
+                    await deleteBackward(editor);
                     window.chai.expect(a.parentElement.isContentEditable).to.be.equal(false);
-                    await insertText(editor, '1');
+                    await deleteBackward(editor);
                     window.chai.expect(a.parentElement.isContentEditable).to.be.equal(false);
-                    await insertText(editor, '2');
+                    await deleteBackward(editor);
                     window.chai.expect(a.parentElement.isContentEditable).to.be.equal(false);
-                    await insertText(editor, '3');
-                    window.chai.expect(a.parentElement.isContentEditable).to.be.equal(false);
+                    await deleteBackward(editor);
                 },
-                contentAfter: '<p>a<a href="#/">123[]</a>c</p>',
+                contentAfter: '<p><a href="#/">[]abc</a></p>',
             });
         });
     });
