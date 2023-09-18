@@ -23,5 +23,6 @@ class StockPickingType(models.Model):
             'view_mode': 'form',
             'res_model': 'shipment_order.scan.out',
             'view_id': self.env.ref('shipment_order.shipment_outbound_wizard_view').id,
-            'target': 'new'
+            'target': 'new',
+            'context': {'new_record': True} 
         }

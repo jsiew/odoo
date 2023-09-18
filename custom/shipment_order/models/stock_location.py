@@ -200,13 +200,23 @@ class Location(models.Model):
                                     ('slot_tag_id', 'in', same_level_tag_ids),
                                     ('rack_tag_id','=',rack_tag_id.id)
                                     ])
+
                     #check if there is quantity in any of these locations
                     quants = self.env['stock.quant'].search([
                                     ('location_id', 'in', same_rack_level_locations.ids), '|',
                                         ('quantity', '>', 0),
                                         ('reserved_quantity', '>', 0),
                                     ])
-                    if len(quants) > 0: return False
+                    #pending move line
+                    mls = self.env['stock.move.line'].search(['|',
+                            ('location_dest_id', 'in', same_rack_level_locations.ids),
+                            ('location_dest_id', '=', self.id),
+                            ('state', 'in', ('draft', 'waiting', 'confirmed', 'assigned', 'partially_available')),
+                            ('reserved_qty', '>', 0),
+                    ])
+                    
+                
+                    if len(quants) > 0 or len(mls) > 0: return False
 
                     #for top shelf, all the bottom slots in the same rack with sequence more than or equal the current slot cannot be occupied
                     if is_top_shelf:
@@ -221,17 +231,18 @@ class Location(models.Model):
                                     ('slot_tag_id', 'in', bottom_shelf_tags.ids),
                                     ('rack_tag_id','=',rack_tag_id.id)
                                     ])
+                        
+                        #stock in location
+                        quants = self.env['stock.quant'].search([
+                                    ('location_id', 'in', bottom_rack_locations.ids), 
+                                    ('quantity', '>', 0),
+                                ])
                         #pending move line
                         mls = self.env['stock.move.line'].search([
                                 ('location_dest_id', 'in', bottom_rack_locations.ids),
                                 ('state', 'in', ('waiting', 'confirmed', 'assigned', 'partially_available')),
                                 ('reserved_qty', '>', 0),
                         ])
-                        #stock in location
-                        quants = self.env['stock.quant'].search([
-                                    ('location_id', 'in', bottom_rack_locations.ids), 
-                                    ('quantity', '>', 0),
-                                ])
                         if len(quants) > 0 or len(mls) > 0: return False
                     
                 

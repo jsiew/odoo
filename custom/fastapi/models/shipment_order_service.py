@@ -162,10 +162,20 @@ def create_notification(
                 }
 
                 
-                #delete cancelled order
+                #delete cancelled order for incoming
                 if notification.data['wcs_state'] == "cancelled" and wcs_order.move_line_id.state != 'done':
-                    wcs_order.move_line_id.write({'qty_done': 0, 'reserved_uom_qty':0, 'state': 'draft'})
-                    wcs_order.move_line_id.unlink()
+                    picking_type_code = wcs_order.move_line_id.picking_type_id.code
+                    if picking_type_code == 'incoming':
+                        wcs_order.move_line_id.write({'qty_done': 0, 'reserved_uom_qty':0, 'state': 'draft'})
+                        wcs_order.move_line_id.unlink()
+                    else:
+                        #clear staging state
+                        staging_id = env['shipment_order.staging.state'].search([
+                                                    ('pallet_id','=', wcs_order.pallet_id.id)
+                                                ])
+                        if staging_id.id:
+                            staging_id.write({'pallet_id':None, 'pallet_date':None})
+
             else:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
@@ -197,10 +207,6 @@ def create_notification(
                         
                         if elevated_tray.id != False:
                             elevated_tray.write({'occupied_state' : 'Empty'})
-                        
-                        move_line = env['stock.move.line'].browse(wcs_order.move_line_id.id)
-                        if move_line.id != False:
-                            move_line.write({'state': 'cancel'})
                             
                         #get link to the wcs transport order form
                         web_base_url = env['ir.config_parameter'].sudo().get_param('web.base.url')
@@ -251,6 +257,22 @@ def create_notification(
                     res = {
                         'status': 'Success',
                         'message': 'General Error Notification Updated'
+                    }
+        elif notification_type == 'notification' and code >= 70000 and code <80000:
+            notification_message = '{}<br />AGV: {}'
+            notification_message = notification_message.format(message,subsystem_id)
+            
+            env.user.notify_warning(message=notification_message,title="WCS Warning", sticky=True)
+            log_id = wcs_log_obj.create({'remarks': 'WCS General Error Received (70000)',
+                                                'wcs_message': message + ' [' + subsystem_id + ']',
+                                                'wcs_message_type':notification_type,
+                                                'wcs_message_code': statusCode,
+                                                'wcs_notification_code': code,
+                                                'wcs_timestamp': datetime.today(),
+                                                'wcs_raw_data':data})
+            res = {
+                        'status': 'Success',
+                        'message': 'General Error Notification Updated (70000)'
                     }
                 
             

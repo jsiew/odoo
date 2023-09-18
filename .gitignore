@@ -48,3 +48,5 @@ package.json
 /share/
 /src/
 *.zip
+custom/web_auto_reload-16.0.1.0.1.zip
+*.zip

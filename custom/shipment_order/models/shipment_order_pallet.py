@@ -22,7 +22,7 @@ class ShipmentPallet(models.Model):
     container_number_actual = fields.Char(related='container_id.container_number_actual',string ='Actual Container No.')
 
     move_line_id = fields.Many2one('stock.move.line', string='Stock Move Line', ondelete='cascade')
-    outbound_move_line_id = fields.Many2one('stock.move.line', string='Outbound Stock Move Line', ondelete='cascade')
+    outbound_move_line_id = fields.Many2one('stock.move.line', string='Outbound Stock Move Line')
 
     transport_order_ids = fields.One2many('shipment_order.move', 'pallet_id', 'Transport Orders')
 
@@ -52,7 +52,7 @@ class ShipmentPalletContainer(models.Model):
     
     pallet_ids = fields.One2many('shipment_order.pallet', 'container_id', 'Pallets')
     picking_id = fields.Many2one('stock.picking', 'Transfer Doc.', index=True, ondelete='cascade', check_company=True)
-    outgoing_picking_id = fields.Many2one('stock.picking', 'Out Transfer Doc.', index=True, ondelete='cascade', check_company=True)
+    outgoing_picking_id = fields.Many2one('stock.picking', 'Out Transfer Doc.', index=True, check_company=True)
     company_id = fields.Many2one(
         'res.company', 'Company', required=True,
         default=lambda s: s.env.company.id, index=True,ondelete='cascade')
@@ -63,9 +63,9 @@ class ShipmentPalletContainer(models.Model):
         for pallet in self.pallet_ids:
             if pallet.move_line_id.is_wcs_order:
                 if pallet.move_line_id.transport_order_id:
-                    if pallet.move_line_id.transport_order_id.wcs_state == 'completed':
+                    if pallet.move_line_id.transport_order_overall_state == 'completed':
                         raise UserError(_('Pallet ' + pallet.name + ' in this container has already been moved to the destination location and cannot be deleted'))
-                    if pallet.move_line_id.transport_order_id.wcs_state not in ('cancelled', 'cancelling'):
+                    if pallet.move_line_id.transport_order_overall_state not in ('cancelled', 'cancelling', 'created'):
                         raise UserError(_('Pallet ' + pallet.name + '  in this container is linked to an active WCS transport order. Please cancel the order in WCS before deleting'))
         return super(ShipmentPalletContainer, self).unlink()
     
@@ -105,7 +105,7 @@ class ShipmentPalletTransportOrder(models.Model):
 
     pallet_id = fields.Many2one('shipment_order.pallet', 'Pallet', index=True, check_company=True, ondelete='cascade')
     picking_id = fields.Many2one('stock.picking', 'Transfer Doc.', index=True, readonly=True, ondelete='cascade')
-    move_line_id = fields.Many2one('stock.move.line', string='Stock Move Line')
+    move_line_id = fields.Many2one('stock.move.line', string='Stock Move Line', ondelete='cascade')
     ref_number = fields.Char(string="B/L/Bkg No.", related="picking_id.ref_number")
     
     company_id = fields.Many2one(
@@ -146,10 +146,11 @@ class ShipmentPalletTransportOrder(models.Model):
 
     def _get_wcs_summary(self):
         for record in self:
-            record.wcs_state_summary = 'TO 1 [ID: ' + record.wcs_id_1 + ']: ' + record.wcs_state_1
-            record.wcs_id_summary = 'TO 1 ID:' + record.wcs_id_1
-            record.wcs_order_desc = 'TO 1 [ID:' + record.wcs_id_1 + ']: Move from ' + record.wcs_pickup_1 + ' to ' + record.wcs_dropoff_1
-            if record.wcs_state_2:
+            if record.wcs_id_1:
+                record.wcs_state_summary = 'TO 1 [ID: ' + record.wcs_id_1 + ']: ' + record.wcs_state_1
+                record.wcs_id_summary = 'TO 1 ID:' + record.wcs_id_1
+                record.wcs_order_desc = 'TO 1 [ID:' + record.wcs_id_1 + ']: Move from ' + record.wcs_pickup_1 + ' to ' + record.wcs_dropoff_1
+            if record.wcs_id_2:
                 if record.wcs_state_2 != '':
                     record.wcs_state_summary += ' TO 2 [ID: ' + record.wcs_id_2 + ']: ' + record.wcs_state_2
                     record.wcs_id_summary += ' TO 2 ID: ' + record.wcs_id_2

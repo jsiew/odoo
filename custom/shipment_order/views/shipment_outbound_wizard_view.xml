@@ -12,13 +12,13 @@
                 </h4>
                 <div name="start" attrs="{'invisible': [('state', '!=', 'start')]}">
                     <group>
+                        <field name="is_wcs_order"/>
                         <field name="customer"/>
                         <field name="shipment_month"/>
                         <field name="shipment_week"/>
                         <field name="container_id" options="{'no_create': True}"/>
-                        
-                        <field name="ref_number" readonly="1"/>
                         <field name="container_number_actual" options="{'no_create': True}"/>
+                        <field name="ref_number" readonly="1"/>
                     </group>
                     <hr />
                     <p><h4 class="modal-title text-break">Pallets</h4></p>

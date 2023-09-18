@@ -288,7 +288,7 @@ class ShipmentWizard(models.TransientModel):
                             ('5', 'May'), ('6', 'June'), ('7', 'July'), ('8', 'August'), 
                             ('9', 'September'), ('10', 'October'), ('11', 'November'), ('12', 'December')], 
                             string='Shipment Month', default=str(date.today().month))
-    shipment_week = fields.Selection([('0','0'),('1','1'),('2','2'),('3','3'),('4','4'),('5','5')], default = str((date.today().day - 1 + (date.today().weekday() - date.today().day + 1) % 7)//7+1)
+    shipment_week = fields.Selection([('0','0'),('1','1'),('2','2'),('3','3'),('4','4')], default = str((date.today().day - 1 + (date.today().weekday() - date.today().day + 1) % 7)//7+1)
                                      )
     
     length = fields.Integer('Length')
@@ -403,29 +403,30 @@ class ShipmentWizard(models.TransientModel):
                 raise exceptions.ValidationError("Please select a pickup location")
             try:
                 root = ET.fromstring("<DATA>" + self.qr_code_data + "</DATA>")
+            
+                qr_pallet_id = root.findtext('ID')
+                qr_ref_id = root.findtext('BL')
+                if root.findtext('BL') == None:
+                    qr_ref_id = root.findtext('BK')
+                qr_customer = root.findtext('CUST')
+                qr_container = root.findtext('DCTR')
+                qr_seal = root.findtext('SEAL')
+                qr_size = root.findtext('SZ')
+                qr_vessel = root.findtext('VSL')
+                qr_voyage = root.findtext('VOY')
+                if root.findtext('ETA'):
+                    qr_eta = datetime.strptime(root.findtext('ETA'), '%d/%m/%y') 
+
+                monthDict = {'JAN':'1', 'FEB':'2', 'MAR': '3', 'APR':'4', 'MAY':'5', 'JUN':'6','JUL':'7','AUG':'8','SEP':'9','OCT':'10','NOV':'11','DEC':'12'}
+                qr_shipment = root.findtext('WK').upper()
+                shipment_arr = qr_shipment.split()
+                qr_shipment_mth = monthDict[shipment_arr[0]]
+                qr_shipment_wk = shipment_arr[2]
+                qr_length = root.findtext('LH')
+                qr_width = root.findtext('WH')
+                qr_height = root.findtext('HT')
             except:
                 raise exceptions.ValidationError("Incorrect QR Code format")
-            qr_pallet_id = root.findtext('ID')
-            qr_ref_id = root.findtext('BL')
-            if root.findtext('BL') == None:
-                qr_ref_id = root.findtext('BK')
-            qr_customer = root.findtext('CUST')
-            qr_container = root.findtext('DCTR')
-            qr_seal = root.findtext('SEAL')
-            qr_size = root.findtext('SZ')
-            qr_vessel = root.findtext('VSL')
-            qr_voyage = root.findtext('VOY')
-            if root.findtext('ETA'):
-                qr_eta = datetime.strptime(root.findtext('ETA'), '%d/%m/%y') 
-
-            monthDict = {'JAN':'1', 'FEB':'2', 'MAR': '3', 'APR':'4', 'MAY':'5', 'JUN':'6','JUL':'7','AUG':'8','SEP':'9','OCT':'10','NOV':'11','DEC':'12'}
-            qr_shipment = root.findtext('WK').upper()
-            shipment_arr = qr_shipment.split()
-            qr_shipment_mth = monthDict[shipment_arr[0]]
-            qr_shipment_wk = shipment_arr[2]
-            qr_length = root.findtext('LH')
-            qr_width = root.findtext('WH')
-            qr_height = root.findtext('HT')
 
             if int(qr_height) > pallet_max_height:
                 raise exceptions.ValidationError("Current pallet height (" + str(qr_height) + ") exceeds pallet max height: " + str(pallet_max_height) )
@@ -523,7 +524,8 @@ class ShipmentWizard(models.TransientModel):
                                     'eta': pallet.eta,
                                     'shipment_month': pallet.shipment_month,
                                     'shipment_week': pallet.shipment_week,
-                                    'scheduled_date': pallet.eta
+                                    'scheduled_date': pallet.eta,
+                                    'state': 'assigned'
                                     })
             self.WIZARD_PICKING_IDS.append(existing_picking.id)
             print("PICKING:" + str(existing_picking))
@@ -584,8 +586,9 @@ class ShipmentWizard(models.TransientModel):
 
     def action_process_wcs_orders(self):
         
-        #only 1 short pallet, send straight to rack
-        if len(self.move_line_ids) == 1 and 'TALL_PALLET' not in move_line.product_id.code:
+        first_move_line = self.move_line_ids[0]
+        #only 1 tall pallet, send straight to rack
+        if len(self.move_line_ids) == 1 and 'SHORT_PALLET' not in first_move_line.product_id.code:
             move_line = self.move_line_ids[0]
             pallet = move_line.pallet_ids[0]
             pickup_location_name = move_line.inbound_from.name
@@ -630,14 +633,19 @@ class ShipmentWizard(models.TransientModel):
 
                     pickup_location_name = move_line.inbound_from.name
                     pickup_elevated_tray = self.env['shipment_order.elevated.tray'].search([('name','=',move_line.inbound_from.name)], limit=1)
-                    is_top_rack = 1
+                    dest_slot = move_line.location_dest_id.slot_tag_id
+                    top_slot_category = self.env['generic.tag.category'].search([
+                                ('code','=', 'top_slot')
+                            ])
+                    if dest_slot.category_id.id in top_slot_category.ids:
+                        is_top_rack = 1
+                    else: is_top_rack = 0
                     
                     #Send from elevated tray to rack
                     if pickup_elevated_tray.id:
-                        if 'TALL_PALLET' in move_line.product_id.code:
+                        if is_top_rack == 0:
                             #send from elevated tray open side to rack
                             pickup_location_name = pickup_elevated_tray.open_side_code
-                            is_top_rack = 0
                         else: pickup_location_name = pickup_elevated_tray.closed_side_code
 
                         wcs_order = self.env['shipment_order.move'].create({'location_id': move_line.inbound_from.id,
@@ -696,50 +704,27 @@ class ShipmentWizard(models.TransientModel):
                                 'wcs_order':wcs_order,
                                 'sequence': 1,
                                 'is_elevated_tray': True,
-                                'is_top_rack': 0,
+                                'is_top_rack': is_top_rack,
                                 'order_sequence' : order_sequence
                             })
                             order_sequence += 1
-                            #self._send_wcs_order(move_line.inbound_from.name, elevated_tray.open_side_code,pallet.name, wcs_order,1)
-
                             
-                            if 'TALL_PALLET' in move_line.product_id.code:
-                                #send from elevated tray open side to rack
-                                wcs_order.write({'wcs_state_2': 'pending',
-                                                'wcs_pickup_2': elevated_tray.open_side_code,
-                                                'wcs_dropoff_2': move_line.location_dest_id.name})
-                                
-                                transport_order_list.append({
-                                    'pickup':elevated_tray.open_side_code,
-                                    'dropoff':move_line.location_dest_id.name,
-                                    'pallet_name': pallet.name,
-                                    'wcs_order':wcs_order,
-                                    'sequence': 2,
-                                    'is_elevated_tray': False,
-                                    'is_top_rack': 0,
-                                    'order_sequence' : order_sequence
-                                })
-                                order_sequence += 1
-                                #self._send_wcs_order(elevated_tray.open_side_code, move_line.location_dest_id.name,pallet.name, wcs_order,2)
-                            else:
-                                #send from elevated tray closed side to rack
-                                wcs_order.write({'wcs_state_2': 'pending',
-                                                'wcs_pickup_2': elevated_tray.closed_side_code,
-                                                'wcs_dropoff_2': move_line.location_dest_id.name})
-                                
-                                transport_order_list.append({
-                                    'pickup':elevated_tray.closed_side_code,
-                                    'dropoff':move_line.location_dest_id.name,
-                                    'pallet_name': pallet.name,
-                                    'wcs_order':wcs_order,
-                                    'sequence': 2,
-                                    'is_elevated_tray': False,
-                                    'is_top_rack': 1,
-                                    'order_sequence' : order_sequence
-                                })
-                                order_sequence += 1
-                                #self._send_wcs_order(elevated_tray.closed_side_code, move_line.location_dest_id.name,pallet.name, wcs_order,2)
-                        
+                            #send from elevated tray open/closed side to rack
+                            wcs_order.write({'wcs_state_2': 'pending',
+                                            'wcs_pickup_2': (elevated_tray.open_side_code if is_top_rack == 0 else elevated_tray.closed_side_code),
+                                            'wcs_dropoff_2': move_line.location_dest_id.name})
+                            
+                            transport_order_list.append({
+                                'pickup':(elevated_tray.open_side_code if is_top_rack == 0 else elevated_tray.closed_side_code),
+                                'dropoff':move_line.location_dest_id.name,
+                                'pallet_name': pallet.name,
+                                'wcs_order':wcs_order,
+                                'sequence': 2,
+                                'is_elevated_tray': False,
+                                'is_top_rack': is_top_rack,
+                                'order_sequence' : order_sequence
+                            })
+                            order_sequence += 1
                         
                         self.WIZARD_WCS_ORDER_IDS.append(wcs_order.id)
                         print("WCS ORDER: " + str(wcs_order))
@@ -811,9 +796,10 @@ class ShipmentWizard(models.TransientModel):
                     wcs_message_type = 'system'
                     msg = ''
                 else:
-                    wcs_order.write({'state_field_name': 'error'})
+                    #wcs_order.write({state_field_name: 'error'})
                     remarks = 'Error creating transport order. ' + msg
                     wcs_message_type = 'system'
+                    raise exceptions.UserError(remarks)
                 
                 log_obj = self.env['shipment_order.movelog']
                 log_id = log_obj.create({'remarks': remarks,
@@ -852,7 +838,7 @@ class ShipmentWizard(models.TransientModel):
         
         move_line_list = self.env['stock.move.line'].search([
                             ('reserved_qty', '>', 0),
-                            ('state', '=', 'assigned'),
+                            ('state', 'in', ('assigned','draft')),
                             ])
         
         #container exists, use existing rack based on last added pallet
@@ -928,6 +914,8 @@ class ShipmentWizard(models.TransientModel):
         return product_obj
             
     def _create_move_line(self, pallet_id, picking_id, is_newly_created_container, container_id, is_wcs_order, pickup_location):
+        
+        
         product_obj = self._get_product(pallet_id, is_newly_created_container, container_id)
 
         lot_obj = self.env['stock.lot']
@@ -963,17 +951,18 @@ class ShipmentWizard(models.TransientModel):
                                     'qty_done': 0,
                                     'is_wcs_order': is_wcs_order,
                                     'pallet_id': pallet_id.id,
-                                    'inbound_from': pickup_location.id})
+                                    'inbound_from': pickup_location.id,
+                                    'state': 'assigned'})
         pallet_id.write({'move_line_id':new_move_line.id})
 
-                
-        if picking_id.state == 'draft':
-            picking_id.action_assign()
-        
         if new_move_line.id:
             new_move_line.move_id.write({'date':picking_id.eta})
             self.WIZARD_MOVE_LINE_IDS.append(new_move_line._origin.id)
             self.WIZARD_MOVE_LINES.append(new_move_line)
+        
+        
+        if picking_id.state == 'draft':
+            picking_id.write({'state':'assigned'})
 
         return new_move_line
                     

@@ -22,7 +22,9 @@ class ShipmentOutScan(models.TransientModel):
     pickup_location = fields.Many2one('stock.location', string='Pickup Location', required='True')
     pickup_is_bottom_rack = fields.Boolean('Is Bottom Rack')
     pickup_slot_tag_sequence = fields.Integer('Slot Tag Sequence')
-    drop_off_location = fields.Many2one('stock.location', string='Drop Off Location', required='True')
+    pickup_rack_tag_sequence = fields.Integer('Rack Tag Sequence')
+    drop_off_location = fields.Many2one('stock.location', string='Drop Off Location')
+    transport_order_sequence = fields.Integer(string='Transport Order Sequence', help='WCS Transport Order Processing Sequence')
 
     
 class ShipmentOutboundWizard(models.TransientModel):
@@ -37,12 +39,12 @@ class ShipmentOutboundWizard(models.TransientModel):
     WIZARD_CONTAINER_IDS = []
 
     
-    customer = fields.Many2one('res.company',string='Customer')
+    customer = fields.Many2one('res.partner',string='Customer',domain="[('is_company', '=', True)]")
     shipment_month = fields.Selection([('1', 'January'), ('2', 'February'), ('3', 'March'), ('4', 'April'),
                             ('5', 'May'), ('6', 'June'), ('7', 'July'), ('8', 'August'), 
                             ('9', 'September'), ('10', 'October'), ('11', 'November'), ('12', 'December')], 
                             string='Shipment Month', default=str(date.today().month))
-    shipment_week = fields.Selection([('0','0'),('1','1'),('2','2'),('3','3'),('4','4'),('5','5')], default = str((date.today().day - 1 + (date.today().weekday() - date.today().day + 1) % 7)//7+1))
+    shipment_week = fields.Selection([('0','0'),('1','1'),('2','2'),('3','3'),('4','4')], default = str((date.today().day - 1 + (date.today().weekday() - date.today().day + 1) % 7)//7+1))
     container_id = fields.Many2one('shipment_order.container',string='Container')
 
 
@@ -56,6 +58,7 @@ class ShipmentOutboundWizard(models.TransientModel):
     wcs_order_ids = fields.One2many('shipment_order.move', compute='_compute_wcs_orders', inverse='_inverse_wcs_orders', string="WCS Orders")
     move_line_ids = fields.One2many('stock.move.line', compute='_compute_move_lines', inverse='_inverse_move_lines', string="Move Lines")
     recompute_wcs_order_ids = fields.Boolean('Recompute WCS Orders', default=True, store=False)
+    is_wcs_order = fields.Boolean('Create WCS Order', default=True)
 
     company_id = fields.Many2one(
         'res.company', 'Company', required=True,
@@ -80,6 +83,13 @@ class ShipmentOutboundWizard(models.TransientModel):
         self.name = "Retrieve Booking"
         self.action_process_pallets()
     
+    def action_cancel(self):
+        if self.is_first_open:
+            self.WIZARD_WCS_ORDER_IDS.clear()
+            self.WIZARD_MOVE_LINE_IDS.clear()
+            self.WIZARD_MOVE_LINES.clear()
+        return {'type': 'ir.actions.act_window_close'}
+    
     def _inverse_move_lines(self):
         return
     
@@ -89,6 +99,11 @@ class ShipmentOutboundWizard(models.TransientModel):
     
     @api.depends('pallet_ids')
     def _compute_move_lines(self):
+        if self.is_first_open == True:
+            self.WIZARD_WCS_ORDER_IDS.clear()
+            self.WIZARD_MOVE_LINE_IDS.clear()
+            self.WIZARD_MOVE_LINES.clear()
+            self.write({'is_first_open': False})
         self.move_line_ids = self.env['stock.move.line'].search([
                                 ('id', 'in', self.WIZARD_MOVE_LINE_IDS),
                                 ])
@@ -111,7 +126,7 @@ class ShipmentOutboundWizard(models.TransientModel):
     def _onchange_fields(self):
         for rec in self:
             pickings = self.env['stock.picking'].search([
-                                ('partner_id','=',rec.customer.partner_id.id),
+                                ('partner_id','=',rec.customer.id),
                                 ('shipment_month','=',rec.shipment_month),
                                 ('shipment_week','=',rec.shipment_week),
                              ]) 
@@ -152,10 +167,12 @@ class ShipmentOutboundWizard(models.TransientModel):
             if existing_picking.id:
                 existing_pallets = []
                 for moveline in existing_picking.move_line_ids:
-                    existing_pallets.append(moveline.pallet_id)
+                    if moveline.transport_order_overall_state != 'cancelled':
+                        existing_pallets.append(moveline.pallet_ids[0])
                 pallet_list = list(filter(lambda x: x not in existing_pallets, pallet_list))
             
             pallets = []
+            racks = []
             for pallet in pallet_list:
                 pallets.append(pallet)
             pallets.sort(key=(lambda x: x.id),reverse=True)
@@ -174,28 +191,52 @@ class ShipmentOutboundWizard(models.TransientModel):
                     if quant_id.id:
                         total_pallets += 1
                         location_id = self.env['stock.location'].browse(quant_id.location_id)
-                        location_drop_id = self.env['shipment_order.staging.state'].search([
-                                                            ('pallet_id', '=', None),
-                                                            ('location_id', 'not in', location_drop_list),
-                                                            ],limit=1,order='staging_sequence')
                         
-                        if location_drop_id.id:
-                            location_drop_list.append(location_drop_id.location_id.id)
+                        if location_id.id:
+                            if location_id.id.rack_tag_id.sequence not in racks:
+                                racks.append(location_id.id.rack_tag_id.sequence)
                             self.env['shipment_order.scan.line.out'].create({
                                                                         'pallet_id' : pallet.name,
                                                                         'length' : pallet.cargo_length,
                                                                         'width' : pallet.cargo_width,
                                                                         'height' : pallet.cargo_height,
                                                                         'pickup_location': location_id.id.id,
-                                                                        'drop_off_location': location_drop_id.location_id.id,
+                                                                        'drop_off_location': None,
                                                                         'shipment_out_id': self.id,
                                                                         'pickup_is_bottom_rack': True if 'Bottom' in location_id.id.slot_tag_id.category_name else False,
-                                                                        'pickup_slot_tag_sequence': location_id.id.slot_tag_id.sequence,})
-                        else: out_of_space_pallets += 1
+                                                                        'pickup_slot_tag_sequence': location_id.id.slot_tag_id.sequence,
+                                                                        'pickup_rack_tag_sequence': location_id.id.rack_tag_id.sequence,
+                                                                        'is_wcs_order': self.is_wcs_order})
+
+            #SORT FROM FURTHEST TO NEAREST RACK, BOTTOM TO TOP RACK, OUTERMOST TO INNERMOST SLOT           
+            racks.sort(reverse=True)
+            wcs_sequence = 1
+            for rack in racks:
+                rack_pallet_list = [x for x in self.pallet_ids if x.pickup_rack_tag_sequence == rack]
+                bottom_pallet_list = [x for x in rack_pallet_list if x.pickup_is_bottom_rack]
+                bottom_pallet_list.sort(key=lambda x: (x.pickup_slot_tag_sequence), reverse=True)
+                top_pallet_list = [x for x in rack_pallet_list if not x.pickup_is_bottom_rack]
+                top_pallet_list.sort(key=lambda x: (x.pickup_slot_tag_sequence), reverse=True)
+                bottom_pallet_list.extend(top_pallet_list)
+                for wizard_pallet in bottom_pallet_list:
+                    location_drop_id = self.env['shipment_order.staging.state'].search([
+                                                                ('pallet_id', '=', None),
+                                                                ('location_id', 'not in', location_drop_list),
+                                                                ],limit=1,order='staging_sequence')
+                    if location_drop_id.id:
+                        location_drop_list.append(location_drop_id.location_id.id)
+                        wizard_pallet.write({'drop_off_location': location_drop_id.location_id.id,
+                                             'transport_order_sequence': wcs_sequence})
+                        wcs_sequence += 1
+                    else: 
+                        wizard_pallet.write({'is_wcs_order': False})
+                        out_of_space_pallets += 1
+            
             if out_of_space_pallets > 0:
                 msg = "Booking No.: " + rec.ref_number + ", Container: " +rec.container_id.container_number + ". \r\n"
-                msg += str(out_of_space_pallets) + '/' + str(total_pallets) +' pallets not processed'
+                msg += 'WCS transport orders not created for ' + str(out_of_space_pallets) + '/' + str(total_pallets) 
                 self.env.user.notify_warning(message=msg,title="Staging Area Full", sticky=True)
+
                     
     def _populate_staging(self):
         # Get locations with staging tag
@@ -237,10 +278,6 @@ class ShipmentOutboundWizard(models.TransientModel):
     def action_process_pallets(self):
         #CREATE/RETRIEVE PICKING
         picking_obj = self.env['stock.picking']
-        existing_picking = picking_obj.search([
-                                ('ref_number', '=ilike', self.ref_number),
-                                ('picking_type_id', '=', 2)
-                                ], limit=1)
         
         incoming_picking = picking_obj.search([
                             ('ref_number', '=ilike', self.container_id.ref_number),
@@ -248,6 +285,11 @@ class ShipmentOutboundWizard(models.TransientModel):
                             ], limit=1)
         if incoming_picking.id == False:
            raise exceptions.ValidationError("No inbound movement found for this booking number")
+        
+        existing_picking = picking_obj.search([
+                                ('ref_number', '=ilike', incoming_picking.ref_number),
+                                ('picking_type_id', '=', 2)
+                                ], limit=1)
         default_locations = self._get_default_locations(incoming_picking.partner_id)
         picking_pickup_location = default_locations['location_id']
         picking_dropoff_location = default_locations['location_dest_id']
@@ -276,28 +318,43 @@ class ShipmentOutboundWizard(models.TransientModel):
         
         # GET PALLETS TO PROCESS
         pallet_names = []
+        pallet_list = []
         for pallet in self.pallet_ids:
             pallet_names.append(pallet.pallet_id)
         
-        #CREATE MOVE LINES ONLY FOR PALLETS TO BE PROCESSED
-        #SORT FROM BOTTOM TO TOP RACK, OUTERMOST TO INNERMOST SLOT
-        bottom_pallet_list = [x for x in self.pallet_ids if x.pickup_is_bottom_rack]
-        bottom_pallet_list.sort(key=lambda x: (x.pickup_slot_tag_sequence), reverse=True)
-        top_pallet_list = [x for x in self.pallet_ids if not x.pickup_is_bottom_rack]
-        top_pallet_list.sort(key=lambda x: (x.pickup_slot_tag_sequence), reverse=True)
-        bottom_pallet_list.extend(top_pallet_list)
+        self.pallet_ids.sorted(key='transport_order_sequence')
 
-        outbound_pallets = list(filter(lambda x: x.name in pallet_names, incoming_picking.pallet_ids))
 
-        for wizard_pallet in bottom_pallet_list:
+        for wizard_pallet in self.pallet_ids:
             outbound_pallet =  next((x for x in incoming_picking.pallet_ids if x.name == wizard_pallet.pallet_id), None)
             #wizard_pallet = next((x for x in self.pallet_ids if x.pallet_id == outbound_pallet.name), None)
-            move_line = self._create_move_line(outbound_pallet, existing_picking, wizard_pallet.is_wcs_order,incoming_picking,wizard_pallet.pickup_location,picking_dropoff_location)
+            existing_move_line = False
+            move_lines = self.env['stock.move.line'].search([
+                            ('picking_id', '=', existing_picking.id)
+                            ])
+            move_line = False
+            for ml in move_lines:
+                if ml.pallet_ids[0].id == outbound_pallet.id:
+                    move_line = ml
+                    break
+            if not move_line:
+                move_line = self._create_move_line(outbound_pallet, existing_picking, wizard_pallet.is_wcs_order,incoming_picking,wizard_pallet.pickup_location,picking_dropoff_location)
+            else: existing_move_line = True
+            
+            #delete existing transport orders
+            if existing_move_line:
+                for to in move_line.transport_order_ids:
+                    to.unlink()
+                move_line.write(
+                    {'is_wcs_order': wizard_pallet.is_wcs_order}
+                )
+
             print("MOVE LINE: " + str(move_line.id))
             if wizard_pallet.is_wcs_order:
                 #BOTTOM RACK: PICK UP FROM RACK, DROP OFF AT STAGING
                 #TOP RACK: 1. PICK UP FROM RACK, DROP OFF AT ELEVATED TRAY CLOSED SIDE
                 #          2. PICK UP FROM ELEVATED TRAY OPEN SIDE, DROP OFF AT STAGING
+
                 if wizard_pallet.pickup_is_bottom_rack:
                     wcs_order = self.env['shipment_order.move'].create({'location_id': wizard_pallet.pickup_location.id,
                                                             'location_dest_id': wizard_pallet.drop_off_location.id,
