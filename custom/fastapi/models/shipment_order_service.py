@@ -7,8 +7,10 @@ from datetime import datetime
 from ..depends import (
     odoo_env,
 )
+import logging
 
 
+_logger = logging.getLogger(__name__)
 class ShipmentOrderEndpoint(models.Model):
 
     _inherit = "fastapi.endpoint"
@@ -67,7 +69,13 @@ def create_notification(
         code = notification.code
         statusCode = notification.statusCode
         data = notification.data['response']
-        print("Notification received: " + str(notification))
+        notification_users = []
+        notification_group = env['res.groups'].search([('full_name','=','Inventory / User')],limit=1)
+        if notification_group.id:
+            for user in notification_group.users:
+                notification_users.append(user.partner_id)
+        _logger.warning("[shipment_order_service.create_notification] Notification received: " + str(notification))
+        
         #AGV id
         subsystem_id = notification.data['subsystem_id']
 
@@ -75,7 +83,7 @@ def create_notification(
             wcs_order = wcs_order_obj.search(['|',
                                 ('wcs_id_1', '=', notification.data['wcs_id']),
                                 ('wcs_id_2', '=', notification.data['wcs_id']),
-                                ], limit=1)
+                                ], limit=1, order='id desc')
             if wcs_order.id:
                 #get link to the wcs transport order form
                 web_base_url = env['ir.config_parameter'].sudo().get_param('web.base.url')
@@ -121,7 +129,7 @@ def create_notification(
                                                     pickup_location, dropoff_location,
                                                     notification.data['wcs_id'], wcs_order.picking_id.name)
                         
-                        env.user.notify_success(message=notification_message,title="WCS Order Completed", sticky=False)
+                        env.user.notify_success(message=notification_message,title="WCS Order Completed", sticky=False, target=notification_users)
                                 
                     case "cancelled":
                         
@@ -134,7 +142,7 @@ def create_notification(
                                                                            str(wcs_order.wcs_id_1) + (('/' + wcs_order.wcs_id_2) if wcs_order.wcs_id_2 else '') ,
                                                                             wcs_order.picking_id.name)
                     
-                        env.user.notify_warning(message=notification_message,title="WCS Order Cancelled", sticky=True)
+                        env.user.notify_warning(message=notification_message,title="WCS Order Cancelled", sticky=False, target=notification_users)
                         
                      
                     case _:
@@ -143,7 +151,7 @@ def create_notification(
                                                                            wcs_order.location_dest_id.name,
                                                                            str(wcs_order.wcs_id_1) + (('/' + wcs_order.wcs_id_2) if wcs_order.wcs_id_2 else '') ,
                                                                            wcs_order.picking_id.name)
-                        env.user.notify_info(message=notification_message,title="WCS Notification Received", sticky=False)
+                        env.user.notify_info(message=notification_message,title="WCS Notification Received", sticky=False, target=notification_users)
 
                 #Write to log
                 log_id = wcs_log_obj.create({'remarks': 'WCS Notification Received',
@@ -167,7 +175,17 @@ def create_notification(
                     picking_type_code = wcs_order.move_line_id.picking_type_id.code
                     if picking_type_code == 'incoming':
                         wcs_order.move_line_id.write({'qty_done': 0, 'reserved_uom_qty':0, 'state': 'draft'})
+                        lot_id = wcs_order.move_line_id.lot_id
+                        #delete move line
                         wcs_order.move_line_id.unlink()
+                        #delete quant
+                        quants = env['stock.quant'].search([
+                                                    ('lot_id','=', lot_id.id)
+                                                ])
+                        for quant in quants:
+                            quant.unlink()
+                        #delete lot
+                        lot_id.unlink()
                     else:
                         #clear staging state
                         staging_id = env['shipment_order.staging.state'].search([
@@ -177,6 +195,7 @@ def create_notification(
                             staging_id.write({'pallet_id':None, 'pallet_date':None})
 
             else:
+                _logger.error("[shipment_order_service.create_notification] Line 198: " + 'WCS ID ' + notification.data['wcs_id'] + ' not found')
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
                     detail='WCS ID ' + notification.data['wcs_id'] + ' not found'
@@ -219,7 +238,7 @@ def create_notification(
                                                                            wcs_order.location_dest_id.name,
                                                                            str(wcs_order.wcs_id_1) + (('/' + wcs_order.wcs_id_2) if wcs_order.wcs_id_2 else '') ,
                                                                             wcs_order.picking_id.name,subsystem_id)
-                        env.user.notify_danger(message=notification_message,title="WCS Transport Order Error", sticky=True)
+                        env.user.notify_danger(message=notification_message,title="WCS Transport Order Error", sticky=True, target=notification_users)
             
                         log_id = wcs_log_obj.create({'remarks': 'WCS Transport Order Error Received',
                                                 'wcs_message': message + ' [' + subsystem_id + ']',
@@ -237,6 +256,7 @@ def create_notification(
                         }
 
                     else:
+                        _logger.error("[shipment_order_service.create_notification] Line 258: " + 'WCS ID ' + notification.data['wcs_id'] + ' not found')
                         raise HTTPException(
                             status_code=status.HTTP_404_NOT_FOUND,
                             detail='WCS ID ' + notification.data['wcs_id'] + ' not found'
@@ -245,7 +265,7 @@ def create_notification(
                 case _:
                     notification_message = '{}<br />AGV: {}'
                     notification_message = notification_message.format(message,subsystem_id)
-                    env.user.notify_danger(message=notification_message,title="WCS General Error", sticky=True)
+                    env.user.notify_danger(message=notification_message,title="WCS General Error", sticky=True, target=notification_users)
 
                     log_id = wcs_log_obj.create({'remarks': 'WCS General Error Received',
                                                 'wcs_message': message + ' [' + subsystem_id + ']',
@@ -262,7 +282,7 @@ def create_notification(
             notification_message = '{}<br />AGV: {}'
             notification_message = notification_message.format(message,subsystem_id)
             
-            env.user.notify_warning(message=notification_message,title="WCS Warning", sticky=True)
+            env.user.notify_warning(message=notification_message,title="WCS Warning", sticky=False, target=notification_users)
             log_id = wcs_log_obj.create({'remarks': 'WCS General Error Received (70000)',
                                                 'wcs_message': message + ' [' + subsystem_id + ']',
                                                 'wcs_message_type':notification_type,
@@ -277,8 +297,10 @@ def create_notification(
                 
             
     except Exception as e:
+        _logger.error("[shipment_order_service.create_notification] Exception: " + str(e))
         raise HTTPException(
                     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                     detail=str(e)
                 )
+    _logger.warning("[shipment_order_service.create_notification] res: " + str(res))
     return res

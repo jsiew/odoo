@@ -42,6 +42,10 @@ class StockMoveLine(models.Model):
     picking_type_id_ref = fields.Integer(related='picking_type_id.id', string ='Picking Type ID')
 
     is_wcs_order = fields.Boolean('Is WCS Order',default=False)
+    #If destination location is manually changed when scanning in, exclude other move lines scanned at the same time when checking for rack availability
+    #Otherwise there will be an error if there is 1 top rack pallet and 1 bottom rack pallet, system will highlight that the bottom pallet is blocking the top pallet
+    move_line_exclusions = fields.Char('Excluded Move Lines',default='')
+
 
     @api.depends('pallet_id')
     def _compute_field_names(self):
@@ -90,6 +94,12 @@ class StockMoveLine(models.Model):
         transport_order = self.env['shipment_order.move'].search([('move_line_id', '=', self.id)], limit=1)
         if transport_order: return True
         else: return False
+
+    def set_exclusions(self,exclusions):
+        ex_list = ""
+        for id in exclusions:
+            ex_list = ex_list + "," + str(id)
+        self.move_line_exclusions = ex_list
 
 
     def transport_order_inverse(self):
@@ -154,7 +164,7 @@ class StockMoveLine(models.Model):
                 for values in quant_data:
                     qty_by_location[values['location_id'][0]] += values['quantity']
 
-                can_use = location_dest_id._check_can_be_used(product_to_check,self.qty_done,None,qty_by_location[location_dest_id.id])
+                can_use = location_dest_id._check_can_be_used(product_to_check,self.qty_done,None,qty_by_location[location_dest_id.id], self.is_wcs_order)
                 if not can_use:
                     raise UserError(_('Destination location is full'))
                 

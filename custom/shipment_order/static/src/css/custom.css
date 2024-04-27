@@ -1,3 +1,25 @@
 .w250 {
     width: 250px !important;
 }
+
+th.o_column_sortable[data-name="location_dest_id"],th.o_column_sortable[data-name="location_id"],th.o_column_sortable[data-name="complete_name"]
+{ 
+    width:220px !important; 
+    max-width:220px !important;
+ } 
+
+ th.o_column_sortable[data-name="lot_name"]
+{ 
+    width:100px !important; 
+    max-width:100px !important;
+ } 
+ th.o_column_sortable[data-name="qty_done"]
+ { 
+     width:60px !important; 
+     max-width:60px !important;
+  } 
+  th.o_column_sortable[data-name="product_id"]
+  { 
+      width:150px !important; 
+      max-width:150px !important;
+   } 

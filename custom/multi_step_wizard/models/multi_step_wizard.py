@@ -87,6 +87,10 @@ class MultiStepWizard(models.AbstractModel):
     def action_cancel(self):
         self.is_first_open = True
         return {'type': 'ir.actions.act_window_close'}
+    
+    def action_close(self):
+        self.is_first_open = True
+        return {'type': 'ir.actions.act_window_close'}
 
     def state_exit_start(self):
         self.state = "final"

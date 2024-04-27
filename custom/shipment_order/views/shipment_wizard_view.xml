@@ -13,7 +13,7 @@
                 <div name="start" attrs="{'invisible': [('state', '!=', 'start')]}">
                     <group>
                         <field name="pickup_location_tag_id" invisible="1"/>
-                        <field name="pickup_location" required="1" options="{'no_create': True}"/>
+                        <field name="pickup_location" options="{'no_create': True}"/>
                         <field name="is_wcs_order" string="Create WCS Transport Order"/>
                         <field name="qr_code_data"/>
                         <field name="shipment_type" invisible="1" />

@@ -138,7 +138,7 @@ class Location(models.Model):
                 return tag
         return None
 
-    def _check_can_be_used(self, product, quantity=0, package=None, location_qty=0):
+    def _check_can_be_used(self, product, quantity=0, package=None, location_qty=0, is_wcs_order=True):
         """Check if product/package can be stored in the location. Quantity
         should in the default uom of product, it's only used when no package is
         specified."""
@@ -160,8 +160,8 @@ class Location(models.Model):
                     return False
                 product_capacity = self.storage_category_id.product_capacity_ids.filtered(lambda pc: pc.product_id == product)
                 # To handle new line without quantity in order to avoid suggesting a location already full
-                if product_capacity and location_qty >= product_capacity.quantity:
-                    return False
+                #if product_capacity and location_qty >= product_capacity.quantity:
+                #    return False
                 if product_capacity and quantity + location_qty > product_capacity.quantity:
                     return False
                 # MMT - Restrict to maximum capacity of storage category 
@@ -169,81 +169,88 @@ class Location(models.Model):
                     if self.storage_category_id.max_total_capacity != 0:
                         if product_capacity and quantity + location_qty > self.storage_category_id.max_total_capacity:
                             return False
-                        
-                # MMT - Drive in rack restrictions: 
-                # if the location is a bottom slot 
-                # - all the bottom slots in the same rack with sequence more than or equal to the current slot cannot be occupied
 
-                # if the location is a top slot
-                # - all the top slots in the same rack with sequence more than the current slot cannot be occupied
-                # - all the bottom slots in the same rack with sequence more than or equal the current slot cannot be occupied
-                
-                #If location has a rack and a slot, validate
-                rack_tag_id = self._get_rack_tag(self)
-                slot_tag_id = self._get_slot_tag(self)
-                if rack_tag_id and slot_tag_id:
-                    is_top_shelf = False    
-                    if self.check_tag_category("top_slot"): is_top_shelf = True
-                    #check that slots with sequence greater than this slot are not occupied
-                    same_level_tag_ids = []
-                    #get tags with sequence more than current tag 
-                    slot_tags = self.env['generic.tag'].search([
-                                    ('category_id', '=', slot_tag_id.category_id.id),
-                                    ('sequence', '>', slot_tag_id.sequence)
-                                    ])
+                if is_wcs_order == True:     
+                    # MMT - Drive in rack restrictions [ONLY WHEN USING AGV, DO NOT RESTRICT FOR MANUAL OPERATIONS]: 
+                    # if the location is a bottom slot 
+                    # - all the bottom slots in the same rack with sequence more than or equal to the current slot cannot be occupied
+
+                    # if the location is a top slot
+                    # - all the top slots in the same rack with sequence more than the current slot cannot be occupied
+                    # - all the bottom slots in the same rack with sequence more than or equal the current slot cannot be occupied
                     
-                    for tag in slot_tags:
-                        same_level_tag_ids.append(tag.id)
-
-                    #get all locations in the same rack and level with sequence more than current tag 
-                    same_rack_level_locations = self.env['stock.location'].search([
-                                    ('slot_tag_id', 'in', same_level_tag_ids),
-                                    ('rack_tag_id','=',rack_tag_id.id)
-                                    ])
-
-                    #check if there is quantity in any of these locations
-                    quants = self.env['stock.quant'].search([
-                                    ('location_id', 'in', same_rack_level_locations.ids), '|',
-                                        ('quantity', '>', 0),
-                                        ('reserved_quantity', '>', 0),
-                                    ])
-                    #pending move line
-                    mls = self.env['stock.move.line'].search(['|',
-                            ('location_dest_id', 'in', same_rack_level_locations.ids),
-                            ('location_dest_id', '=', self.id),
-                            ('state', 'in', ('draft', 'waiting', 'confirmed', 'assigned', 'partially_available')),
-                            ('reserved_qty', '>', 0),
-                    ])
-                    
-                
-                    if len(quants) > 0 or len(mls) > 0: return False
-
-                    #for top shelf, all the bottom slots in the same rack with sequence more than or equal the current slot cannot be occupied
-                    if is_top_shelf:
-                        tag_category = self.env['generic.tag.category'].search([
-                                            ('code', '=', 'bottom_slot'),
-                                            ],limit=1)
-                        bottom_shelf_tags = self.env['generic.tag'].search([
-                                        ('category_id', '=', tag_category.id),
-                                        ('sequence', '>=', slot_tag_id.sequence)
+                    #If location has a rack and a slot, validate
+                    rack_tag_id = self._get_rack_tag(self)
+                    slot_tag_id = self._get_slot_tag(self)
+                    if rack_tag_id and slot_tag_id:
+                        is_top_shelf = False    
+                        if self.check_tag_category("top_slot"): is_top_shelf = True
+                        #check that slots with sequence greater than this slot are not occupied
+                        same_level_tag_ids = []
+                        #get tags with sequence more than current tag 
+                        slot_tags = self.env['generic.tag'].search([
+                                        ('category_id', '=', slot_tag_id.category_id.id),
+                                        ('sequence', '>', slot_tag_id.sequence)
                                         ])
-                        bottom_rack_locations = self.env['stock.location'].search([
-                                    ('slot_tag_id', 'in', bottom_shelf_tags.ids),
-                                    ('rack_tag_id','=',rack_tag_id.id)
-                                    ])
                         
-                        #stock in location
+                        for tag in slot_tags:
+                            same_level_tag_ids.append(tag.id)
+
+                        #get all locations in the same rack and level with sequence more than current tag 
+                        same_rack_level_locations = self.env['stock.location'].search([
+                                        ('slot_tag_id', 'in', same_level_tag_ids),
+                                        ('rack_tag_id','=',rack_tag_id.id)
+                                        ])
+
+                        #check if there is quantity in any of these locations
                         quants = self.env['stock.quant'].search([
-                                    ('location_id', 'in', bottom_rack_locations.ids), 
-                                    ('quantity', '>', 0),
-                                ])
+                                        ('location_id', 'in', same_rack_level_locations.ids), '|',
+                                            ('quantity', '>', 0),
+                                            ('reserved_quantity', '>', 0),
+                                        ])
                         #pending move line
-                        mls = self.env['stock.move.line'].search([
-                                ('location_dest_id', 'in', bottom_rack_locations.ids),
-                                ('state', 'in', ('waiting', 'confirmed', 'assigned', 'partially_available')),
+                        mls = self.env['stock.move.line'].search(['|',
+                                ('location_dest_id', 'in', same_rack_level_locations.ids),
+                                ('location_dest_id', '=', self.id),
+                                ('state', 'in', ('draft', 'waiting', 'confirmed', 'assigned', 'partially_available')),
                                 ('reserved_qty', '>', 0),
                         ])
-                        if len(quants) > 0 or len(mls) > 0: return False
+                        ml_list = []
+                        for ml in mls:
+                            if str(ml.id) not in ml.move_line_exclusions:
+                                ml_list.append(ml)
+                        if len(quants) > 0 or len(ml_list)>0: return False
+
+                        #for top shelf, all the bottom slots in the same rack with sequence more than or equal the current slot cannot be occupied
+                        if is_top_shelf:
+                            tag_category = self.env['generic.tag.category'].search([
+                                                ('code', '=', 'bottom_slot'),
+                                                ],limit=1)
+                            bottom_shelf_tags = self.env['generic.tag'].search([
+                                            ('category_id', '=', tag_category.id),
+                                            ('sequence', '>=', slot_tag_id.sequence)
+                                            ])
+                            bottom_rack_locations = self.env['stock.location'].search([
+                                        ('slot_tag_id', 'in', bottom_shelf_tags.ids),
+                                        ('rack_tag_id','=',rack_tag_id.id)
+                                        ])
+                            
+                            #stock in location
+                            quants = self.env['stock.quant'].search([
+                                        ('location_id', 'in', bottom_rack_locations.ids), 
+                                        ('quantity', '>', 0),
+                                    ])
+                            #pending move line
+                            mls = self.env['stock.move.line'].search([
+                                    ('location_dest_id', 'in', bottom_rack_locations.ids),
+                                    ('state', 'in', ('draft', 'waiting', 'confirmed', 'assigned', 'partially_available')),
+                                    ('reserved_qty', '>', 0),
+                            ])
+                            ml_list = []
+                            for ml in mls:
+                                if str(ml.id) not in ml.move_line_exclusions:
+                                    ml_list.append(ml)
+                            if len(quants) > 0 or len(ml_list)>0: return False
                     
                 
             positive_quant = self.quant_ids.filtered(lambda q: float_compare(q.quantity, 0, precision_rounding=q.product_id.uom_id.rounding) > 0)

@@ -195,10 +195,12 @@ export function useThreedScene(containerRef, initConfig) {
     function setRendererSize(width, height, fullwidth = false) {
         camera.aspect = width / height;
         camera.updateProjectionMatrix();
-        if (fullwidth) {
-            renderer.setSize(width, height);
-        } else {
-            renderer.setSize(width - 20, height - 20);
+        if(renderer != null){
+            if (fullwidth) {
+                renderer.setSize(width, height);
+            } else {
+                renderer.setSize(width - 20, height - 20);
+            }
         }
     }
 

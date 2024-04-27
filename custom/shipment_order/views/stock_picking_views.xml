@@ -130,15 +130,22 @@
         <field name="model">stock.picking</field>
         <field name="inherit_id" ref="stock.vpicktree"/>
         <field name="arch" type="xml">
+            <xpath expr="//field[@name='location_id']" position="replace">
+            </xpath>
+            <xpath expr="//field[@name='location_dest_id']" position="replace">
+            </xpath>
+            <xpath expr="//field[@name='partner_id']" position="replace">
+                <field name="partner_id"  optional="show" string="Customer"/>
+            </xpath>
             <xpath expr="//field[@name='scheduled_date']" position="after">
                 <field name="shipment_month"  optional="show" string="Month"/>
                 <field name="shipment_week"  optional="show" string="Week"/>
             </xpath>
             <xpath expr="//field[@name='origin']" position="replace">
                 <field name="ref_number"  optional="show"/>
-                <field name="num_containers"  optional="show"/>
+                <field name="containers" widget="many2many_tags"/>
                 <field name="num_pallets"  optional="show"/>
-            </xpath>
+            </xpath> 
         </field>
     </record>
 </odoo>

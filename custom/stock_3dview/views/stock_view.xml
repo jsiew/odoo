@@ -74,12 +74,12 @@
                                         <t
                                             t-if="stock_quant.product_code or stock_quant.product_lot"
                                         >
-                                            <t t-if="stock_quant.product_code">
-                                                <t t-esc="stock_quant.product_code" />
+                                            <t t-if="stock_quant.customer">
+                                                Customer: <t t-esc="stock_quant.customer" />
                                             </t>
-                                            <t t-if="stock_quant.booking_num != ''">
+                                            <t t-if="stock_quant.shipment_month_week">
                                                 <br />
-                                                Bkg/BL No.: <t t-esc="stock_quant.booking_num"/>
+                                                Date: <t t-esc="stock_quant.shipment_month_week" />
                                             </t>
                                             <t t-if="stock_quant.container_num != ''">
                                                 <br />
@@ -88,6 +88,10 @@
                                             <t t-if="stock_quant.product_lot">
                                                 <br />
                                                 Pallet: <t t-esc="stock_quant.product_lot"/>
+                                            </t>
+                                            <t t-if="stock_quant.booking_num != ''">
+                                                <br />
+                                                Bkg/BL No.: <t t-esc="stock_quant.booking_num"/>
                                             </t>
                                             <!-- : -->
                                         </t>

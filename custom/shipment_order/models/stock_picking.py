@@ -25,6 +25,7 @@ class StockPicking(models.Model):
 
     num_containers = fields.Integer('No. of Containers', compute='_compute_qty')
     num_pallets = fields.Integer('No. of Pallets', compute='_compute_qty')
+    containers = fields.One2many('shipment_order.container',string="Container(s)", compute='_compute_qty')
     
     qr_code_data = fields.Char(string="Scan QR Code", store=False)
     #States: 
@@ -40,7 +41,10 @@ class StockPicking(models.Model):
     def _compute_qty(self):
         for record in self:
             record.num_containers = len(record.container_ids)
-            if record.num_containers == 0: record.num_containers = len(record.outgoing_container_ids)
+            if record.num_containers == 0: 
+                record.num_containers = len(record.outgoing_container_ids)
+                record.containers = record.outgoing_container_ids
+            else: record.containers = record.container_ids
             record.num_pallets = len(record.pallet_ids)
 
     def button_validate(self):
@@ -54,6 +58,15 @@ class StockPicking(models.Model):
     def action_assign(self):
         res = super(StockPicking, self).action_assign()
         return res
+    
+    def unlink(self):
+        self.move_ids._action_cancel()
+        self.with_context(prefetch_fields=False).move_ids.unlink()  # Checks if moves are not done
+        if self.picking_type_id.id == 1:
+            for container in self.container_ids:
+                container.unlink()
+        return super(StockPicking, self).unlink()
+        
     
     def _compute_pallet_ids(self):
         for record in self:

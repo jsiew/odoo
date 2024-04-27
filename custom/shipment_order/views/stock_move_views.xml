@@ -11,6 +11,11 @@
                     <attribute name="create">0</attribute>
                     <attribute name="edit">0</attribute>
                     <attribute name="delete">0</attribute>
+                    <attribute name="default_order">create_date, id</attribute>
+                </xpath>
+                <xpath expr="//field[@name='product_id']" position="replace">
+                    <field name="product_id" invisible="1" required="1" context="{'default_detailed_type': 'product'}" attrs="{'readonly': ['|', ('state', '=', 'done'), ('move_id', '!=', False)]}"/>
+                    <field name="create_date"/>
                 </xpath>
                 <xpath expr="//field[@name='qty_done']" position="after">
                     <field name = "is_locked" invisible="1" />
@@ -28,7 +33,7 @@
                 <xpath expr="//field[@name='location_dest_id'][1]" position="replace">
                     <field name="pickup_location_tag_id" invisible="1"/>
                     <field name="inbound_from" attrs="{'column_invisible': [('parent.picking_type_code', '=', 'outgoing')],'readonly': [('transport_order_overall_state', 'not in', ('pending','no wcs order')),('state', 'in', ('done', 'cancel')), ('is_locked', '=', True)]}"/>
-                    <field name="outbound_to"  width="180px" attrs="{'column_invisible': [('parent.picking_type_code', '=', 'incoming')],'readonly': [('transport_order_overall_state', 'not in', ('pending','no wcs order')),('state', 'in', ('done', 'cancel')), ('is_locked', '=', True)]}"/>
+                    <field name="outbound_to"  attrs="{'column_invisible': [('parent.picking_type_code', '=', 'incoming')],'readonly': [('transport_order_overall_state', 'not in', ('pending','no wcs order')),('state', 'in', ('done', 'cancel')), ('is_locked', '=', True)]}"/>
                     <field name="location_dest_id" invisible="1" />
                     <!-- <field name="location_dest_id" readonly="1" invisible="not context.get('show_destination_location')" domain="[('id', 'child_of', parent.location_dest_id), '|', ('company_id', '=', False), ('company_id', '=', company_id), ('usage', '!=', 'view')]" groups="stock.group_stock_multi_locations"/> -->
                 </xpath>

@@ -5,6 +5,7 @@ from odoo import _, api, models
 
 class StockLocation(models.Model):
     _inherit = "stock.location"
+    MONTHS = ['Jan', 'Feb', 'Mar', 'Apr','May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct','Nov', 'Dec']
 
     def threedView(self):
         return {
@@ -35,6 +36,8 @@ class StockLocation(models.Model):
                      ],limit=1)
                 booking_num = container.ref_number
                 container_num = container.container_number
+                shipment_month_week = self.MONTHS[int(container.picking_id.shipment_month)] + ' Week ' + container.picking_id.shipment_week
+                customer = container.picking_id.partner_id.name
                 
             stock_quants.append(
                 {
@@ -44,6 +47,8 @@ class StockLocation(models.Model):
                     "product_lot": stock_quant.lot_id.name,
                     "booking_num": booking_num,
                     "container_num": container_num,
+                    "customer": customer,
+                    "shipment_month_week": shipment_month_week
                 }
             )
         return {"barcode": location.name, "stock_quants": stock_quants}

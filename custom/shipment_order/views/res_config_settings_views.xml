@@ -26,6 +26,17 @@
                                         <field name="shipment_short_pallet_max_height" class="text-center oe_inline" />
                                         <span> cm</span>
                                     </div>
+                                    <span class="o_form_label">Dummy Pallet Height</span>
+                                    <div class="text-muted content-group mt16">
+                                        <span>Short dummy pallet height: </span>
+                                        <field name="short_dummy_pallet_height" class="text-center oe_inline" />
+                                        <span> cm</span>
+                                    </div>
+                                    <div class="text-muted content-group mt16">
+                                        <span>Tall dummy pallet height: </span>
+                                        <field name="tall_dummy_pallet_height" class="text-center oe_inline" />
+                                        <span> cm</span>
+                                    </div>
                                     <span class="o_form_label">WMS Interface URL</span>
                                     <div class="text-muted content-group mt16">
                                         <span>URL of the WMS Web Service e.g. http://192.168.1.100/WcsInterface: </span>

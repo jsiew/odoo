@@ -25,9 +25,17 @@
                         />
                         <button
                             name="action_cancel"
+                            string="Cancel"
+                            type="object"
+                            class="btn btn-default"
+                            attrs="{'invisible':[('state','==','final')]}"
+                        />
+                        <button
+                            name="action_close"
                             string="Close"
                             type="object"
                             class="btn btn-default"
+                            attrs="{'invisible':[('state','!=','final')]}"
                         />
                     </div>
                 </footer>

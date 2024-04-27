@@ -31,6 +31,7 @@
                             <field name="width"/>
                             <field name="height"/>
                             <field name="is_wcs_order"/>
+                            <field name="process_order"/>
                         </tree>
                     </field>
                 </div>
@@ -60,6 +61,7 @@
                         <field name="pickup_location" readonly="1" required="1" options="{'no_create': True}"/>
                         <field name="drop_off_location" required="1" options="{'no_create': True}"/>
                         <field name="is_wcs_order"/>
+                        <field name="process_order"/>
                     </group>
                     <group>
                         <field name="pallet_id" readonly="1" />

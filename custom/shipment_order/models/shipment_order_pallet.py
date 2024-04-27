@@ -51,7 +51,7 @@ class ShipmentPalletContainer(models.Model):
     ], default='20', required=True)
     
     pallet_ids = fields.One2many('shipment_order.pallet', 'container_id', 'Pallets')
-    picking_id = fields.Many2one('stock.picking', 'Transfer Doc.', index=True, ondelete='cascade', check_company=True)
+    picking_id = fields.Many2one('stock.picking', 'Transfer Doc.', index=True, check_company=True)
     outgoing_picking_id = fields.Many2one('stock.picking', 'Out Transfer Doc.', index=True, check_company=True)
     company_id = fields.Many2one(
         'res.company', 'Company', required=True,
