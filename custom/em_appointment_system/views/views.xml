@@ -170,6 +170,7 @@
                     <filter string="Expire" name="order_expire" domain="[('state', '=', 'expire')]"/>
                     <filter string="Close" name="order_close" domain="[('state', '=', 'done')]"/>
                     <filter string="User" name="order_user" domain="[('user_id', '=', uid)]"/>
+                    <filter string="Today" name="order_today" domain="[('date', '&gt;=', context_today().strftime('%Y-%m-%d 00:00:00')),('date', '&lt;=', context_today().strftime('%Y-%m-%d 23:59:59'))]" />
                     <group string="Group By" expand="1">
                         <filter string="User" name="group_by_user_id"
                                 context="{'group_by': 'user_id'}"/>
@@ -574,7 +575,7 @@
             <field name="context">{'create': False}</field>
             <field name="help" type="html">
                 <p class="o_view_nocontent_smiling_face">
-                    There is no appointment created for you, When created that will be visible here.
+                    There is no appointments.
                 </p>
             </field>
         </record>
@@ -582,11 +583,11 @@
         <record model="ir.actions.act_window" id="em_appointment_system_action_window">
             <field name="name">Appointments</field>
             <field name="res_model">em.appointment.system</field>
-            <field name="view_mode">kanban,tree,form,calendar</field>
-            <field name="context">{'search_default_order_user':1}</field>
+            <field name="view_mode">tree,kanban,form,calendar</field>
+            <field name="context">{'search_default_order_draft':1,'search_default_order_confirmed':1}</field>
             <field name="help" type="html">
                 <p class="o_view_nocontent_smiling_face">
-                    There is no appointment created for you, When created that will be visible here.
+                    There are no appointments.
                 </p>
             </field>
         </record>
@@ -660,7 +661,7 @@
                   parent="em_appointment_system_menu_conf"
                   action="action_contacts_appointee"/>
 
-        <menuitem name="Appointment Type" id="appointment_type_list_item"
+        <menuitem name="Visit Type" id="appointment_type_list_item"
                   parent="em_appointment_system_menu_conf" groups="em_appointment_system.group_eas_manager"
                   action='appointment_type_action_window'/>
 

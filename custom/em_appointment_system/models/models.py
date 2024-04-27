@@ -35,7 +35,8 @@ class EmAppointments(models.Model):
             'default_user_id': self.user_id.id,
         }
         context = {**context}
-        action['domain'] = [('user_id', '=', self.env.user.id)]
+        action['domain'] = [('user_id', '=', self.user_id.id)]
+        #action['domain'] = [('user_id', '=', self.env.user.id)]
         action['context'] = context
         action['help'] = """<p class="o_view_nocontent_smiling_face">
                           There are no appointments!
@@ -53,7 +54,9 @@ class EmAppointments(models.Model):
         }
         context = {**context}
         action['context'] = context
-        action['domain'] = [('user_id', '=', self.env.user.id), ('date', '=', datetime.today().date()), ]
+        action['domain'] = [('user_id', '=', self.user_id.id), ('date', '=', datetime.today().date()), ]
+        #action['domain'] = [('user_id', '=', self.env.user.id), ('date', '=', datetime.today().date()), ]
+        
         action['help'] = """<p class="o_view_nocontent_smiling_face">
                     There are no appointments for today!
                 </p>"""
@@ -70,7 +73,8 @@ class EmAppointments(models.Model):
         }
         context = {**context}
         action['context'] = context
-        action['domain'] = [('user_id', '=', self.env.user.id), ('date', '>=', datetime.today().date()), ]
+        action['domain'] = [('user_id', '=', self.user_id.id), ('date', '>=', datetime.today().date()), ]
+        #action['domain'] = [('user_id', '=', self.env.user.id), ('date', '>=', datetime.today().date()), ]
         action['help'] = """<p class="o_view_nocontent_smiling_face">
                            You do not have any upcoming appointments for next days!
                        </p>"""
